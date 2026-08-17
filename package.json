@@ -1,0 +1,18 @@
+{
+  "name": "tenancy-schedule-tools",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "verify:config": "node _migration/verify-config.mjs"
+  },
+  "dependencies": {
+    "xlsx-js-style": "^1.2.0"
+  },
+  "devDependencies": {
+    "vite": "^6.0.0"
+  }
+}
