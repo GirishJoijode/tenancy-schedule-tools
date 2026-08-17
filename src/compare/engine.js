@@ -20,6 +20,7 @@ export function getUnitMappedCompareColumns(mappingConfig) {
         break;
       }
     }
+    if (entry && entry.ignore === true) continue;
     if (entry && entry.unitMapping && entry.unitMapping.type === 'source') {
       cols.push({
         id: templateCol.id,

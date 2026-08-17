@@ -1,18 +1,30 @@
 import './styles.css';
 import { initialiseMappingState } from './config/mapping.js';
 import { setupCompareTool } from './compare/ui.js';
+import {
+  setupPropertySummaryTool,
+  refreshPropertySummaryStatus,
+} from './propertySummary/propertySummaryUI.js';
+import { setupScheduleTypeSwitcher } from './ui/scheduleTypeSelect.js';
 import { setupSettingsUI } from './settings/settingsUI.js';
 import { setupDropzone, setupGenerateButton, refreshStatus } from './standardiser/ui.js';
 import { setupAppModeSwitcher } from './ui/appSwitcher.js';
 
+function refreshAllStatus() {
+  refreshStatus();
+  refreshPropertySummaryStatus();
+}
+
 function init() {
   initialiseMappingState();
-  document.querySelectorAll('#view-standardiser .dropzone').forEach(setupDropzone);
+  document.querySelectorAll('#schedule-tenancy .dropzone').forEach(setupDropzone);
+  setupScheduleTypeSwitcher();
+  setupPropertySummaryTool();
   setupAppModeSwitcher();
   setupCompareTool();
-  setupSettingsUI({ onConfigChanged: refreshStatus });
+  setupSettingsUI({ onConfigChanged: refreshAllStatus });
   setupGenerateButton();
-  refreshStatus();
+  refreshAllStatus();
 }
 
 if (document.readyState === 'loading') {

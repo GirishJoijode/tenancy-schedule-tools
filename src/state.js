@@ -3,6 +3,11 @@ export const APP_STATE = {
   unit: null,
   mappingConfig: null,
   mappingConfigured: false,
+  scheduleType: 'tenancy',
+};
+
+export const PROPERTY_SUMMARY_STATE = {
+  property: null,
 };
 
 export const COMPARE_STATE = {

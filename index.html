@@ -3,22 +3,54 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tenancy Schedule Standardiser</title>
+    <title>Tenancy Schedule Tools</title>
   </head>
   <body>
-<div id="app" class="app-mode-standardiser">
-  <header class="app-header">
-    <div class="app-switcher" role="tablist" aria-label="Application mode">
-      <button type="button" class="app-switcher-btn active" id="mode-standardiser-btn" data-app-mode="standardiser">Standardiser</button>
-      <button type="button" class="app-switcher-btn" id="mode-compare-btn" data-app-mode="compare">TS Compare</button>
+<header class="brand-header">
+  <div class="brand-header-inner">
+    <div class="brand-identity">
+      <span class="brand-accent" aria-hidden="true"></span>
+      <div class="brand-copy">
+        <h1>Tenancy Schedule Tools</h1>
+        <p>Valuation schedule preparation and analysis</p>
+      </div>
     </div>
-    <h1 id="app-title">Tenancy Schedule Standardiser</h1>
-    <p class="subtitle" id="app-subtitle">
-      Convert Property and Unit level exports into the standard tenancy schedule.
-    </p>
-  </header>
+  </div>
+</header>
+<div id="app" class="app-mode-standardiser">
+  <div class="app-tools-bar">
+    <span class="app-tools-label">Tools</span>
+    <nav class="app-tools-nav" id="app-tools-nav" role="tablist" aria-label="Application tools"></nav>
+  </div>
 
   <div id="view-standardiser">
+  <div class="schedule-type-bar">
+    <label class="schedule-type-label" id="schedule-type-label" for="schedule-type-trigger">Schedule Type</label>
+    <div class="schedule-type-select" id="schedule-type-select">
+      <button
+        type="button"
+        class="schedule-type-trigger"
+        id="schedule-type-trigger"
+        aria-haspopup="listbox"
+        aria-expanded="false"
+        aria-controls="schedule-type-menu"
+        aria-labelledby="schedule-type-label schedule-type-trigger-label"
+      >
+        <span id="schedule-type-trigger-label">Default</span>
+        <span class="schedule-type-chevron" aria-hidden="true"></span>
+      </button>
+      <ul
+        class="schedule-type-menu hidden"
+        id="schedule-type-menu"
+        role="listbox"
+        aria-labelledby="schedule-type-label"
+      ></ul>
+    </div>
+    <p class="schedule-type-blurb" id="schedule-type-blurb">
+      Convert Property and Unit level exports into the standard tenancy schedule.
+    </p>
+  </div>
+  <div id="schedule-tenancy">
   <main class="app-main">
     <section class="upload-grid" aria-label="File uploads">
       <div
@@ -116,6 +148,69 @@
       </div>
     </section>
   </main>
+  </div>
+
+  <div id="schedule-property-summary" class="hidden">
+    <main class="app-main">
+      <section class="upload-grid upload-grid-single" aria-label="Property Only file upload">
+        <div
+          class="dropzone"
+          id="ps-property-dropzone"
+          data-file-type="property"
+          tabindex="0"
+          role="button"
+          aria-label="Upload Property Level Excel file"
+        >
+          <div class="dropzone-label">Property Level File</div>
+          <div class="dropzone-idle" data-role="idle">
+            <p class="dropzone-prompt">
+              Drag and drop Property Level .xlsx file here
+            </p>
+            <p class="dropzone-or">or</p>
+            <button type="button" class="browse-btn" data-role="browse">
+              Browse File
+            </button>
+          </div>
+          <div class="dropzone-success hidden" data-role="success">
+            <p class="success-line" data-role="filename"></p>
+            <p class="success-line">✓ Header row detected</p>
+            <p class="success-line" data-role="columns"></p>
+            <p class="success-line" data-role="rows"></p>
+          </div>
+          <div class="dropzone-error hidden" data-role="error"></div>
+          <input
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            class="file-input"
+            data-role="input"
+          />
+        </div>
+      </section>
+
+      <section class="status-panel" aria-label="Property Only status">
+        <div class="status-grid status-grid-two">
+          <div class="status-card">
+            <h2>Property Level</h2>
+            <div id="ps-property-status"><div class="status-lines"><div>No file loaded</div></div></div>
+          </div>
+          <div class="status-card">
+            <h2>Configuration</h2>
+            <div id="ps-mapping-status"><div class="status-lines"><div>0 of 14 Property Only fields mapped</div></div></div>
+          </div>
+        </div>
+
+        <div class="generate-area">
+          <button type="button" id="ps-generate-btn" class="generate-btn" disabled>
+            Generate Property Only
+          </button>
+          <p class="generate-hint" id="ps-generate-hint">
+            Upload a Property Level .xlsx file to enable generation.
+          </p>
+          <div id="ps-generate-result" class="generate-result hidden" aria-live="polite"></div>
+        </div>
+      </section>
+    </main>
+  </div>
   </div>
 
 
@@ -244,17 +339,22 @@
       <div>
         <h2 id="settings-title">Advanced Settings</h2>
         <p class="modal-subtitle">
-          Configure how raw Property and Unit level fields map into the Standardised Tenancy Schedule.
+          Configure how source fields map into each standardised schedule.
         </p>
       </div>
       <button type="button" class="modal-close" data-role="close" aria-label="Close" title="Close"><svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    </div>
+
+    <div class="settings-template-bar">
+      <label class="schedule-type-label" for="settings-template-select">Schedule Template</label>
+      <select id="settings-template-select" class="settings-template-select"></select>
     </div>
 
     <div class="settings-tabs" role="tablist">
       <button type="button" class="settings-tab active" data-settings-tab="mapping" role="tab">
         Column Mapping
       </button>
-      <button type="button" class="settings-tab" data-settings-tab="matching" role="tab">
+      <button type="button" class="settings-tab" data-settings-tab="matching" role="tab" id="settings-matching-tab">
         Property Matching
       </button>
       <button type="button" class="settings-tab" data-settings-tab="configuration" role="tab">
@@ -266,33 +366,66 @@
       <div data-role="settings-feedback" class="settings-feedback hidden"></div>
 
       <section data-settings-panel="mapping" class="settings-panel-section">
-        <div id="mapping-summary" class="mapping-summary"></div>
-        <div class="mapping-toolbar">
-          <label class="filter-label" for="mapping-filter">Filter columns</label>
-          <input
-            id="mapping-filter"
-            type="search"
-            class="mapping-filter"
-            placeholder="Search standardised columns..."
-          />
+        <div id="tenancy-mapping-block">
+          <div id="mapping-summary" class="mapping-summary"></div>
+          <div class="mapping-toolbar">
+            <label class="filter-label" for="mapping-filter">Filter columns</label>
+            <input
+              id="mapping-filter"
+              type="search"
+              class="mapping-filter"
+              placeholder="Search standardised columns..."
+            />
+          </div>
+          <div class="mapping-table-wrap">
+            <table class="mapping-table">
+              <thead>
+                <tr>
+                  <th>Standardised Column</th>
+                  <th>Property Row Source</th>
+                  <th>Unit / TS Row Source</th>
+                  <th class="col-ignore" title="Excluded from generated schedule">Ignore</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="mapping-table-body"></tbody>
+            </table>
+          </div>
+          <p class="settings-note">
+            Upload representative Property and Unit .xlsx files first so source field dropdowns are populated.
+            Unmapped columns stay in the output as blank fields. Tick Ignore to omit a column.
+          </p>
         </div>
-        <div class="mapping-table-wrap">
-          <table class="mapping-table">
-            <thead>
-              <tr>
-                <th>Standardised Column</th>
-                <th>Property Row Source</th>
-                <th>Unit / TS Row Source</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody id="mapping-table-body"></tbody>
-          </table>
+
+        <div id="ps-mapping-block" class="hidden">
+          <div id="ps-mapping-summary" class="mapping-summary"></div>
+          <div class="mapping-toolbar">
+            <label class="filter-label" for="ps-mapping-filter">Filter columns</label>
+            <input
+              id="ps-mapping-filter"
+              type="search"
+              class="mapping-filter"
+              placeholder="Search standardised columns..."
+            />
+          </div>
+          <div class="mapping-table-wrap">
+            <table class="mapping-table">
+              <thead>
+                <tr>
+                  <th>Standardised Column</th>
+                  <th>Property Level Source</th>
+                  <th class="col-ignore" title="Excluded from generated schedule">Ignore</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="ps-mapping-table-body"></tbody>
+            </table>
+          </div>
+          <p class="settings-note">
+            Property Only uses Property Level fields only. Blank mappings stay in the output as empty columns.
+            Tick Ignore to omit a column.
+          </p>
         </div>
-        <p class="settings-note">
-          Upload representative Property and Unit .xlsx files first so source field dropdowns are populated.
-          Labels include the group/section name because detailed headings can repeat.
-        </p>
       </section>
 
       <section data-settings-panel="matching" class="settings-panel-section hidden">
@@ -324,9 +457,6 @@
           </div>
         </dl>
         <div class="config-actions">
-          <button type="button" id="btn-apply-config" class="btn-secondary">
-            Apply Configuration
-          </button>
           <button type="button" id="btn-export-config" class="btn-primary">
             Export Configuration
           </button>
@@ -350,6 +480,10 @@
           <strong>Reset Mapping</strong> restores the original default mappings that shipped with the application.
         </p>
       </section>
+    </div>
+    <div class="settings-footer">
+      <span id="settings-dirty-state" class="settings-dirty-state"></span>
+      <button type="button" id="btn-save-config" class="btn-primary">Save Changes</button>
     </div>
   </div>
 </div>

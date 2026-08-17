@@ -5,6 +5,7 @@ import {
   STANDARD_TEMPLATE_COLUMNS,
 } from './constants.js';
 import { loadRuntimeConfig, saveRuntimeConfig } from './configManager.js';
+import { ensurePropertySummaryOnConfig, normalisePropertySummaryConfig } from './propertySummaryColumns.js';
 import { normaliseHeader } from '../excel/parser.js';
 import { APP_STATE } from '../state.js';
 
@@ -23,7 +24,7 @@ export function sourceMappingFromColumn(sourceColumn) {
 }
 
 export function createEmptyMappingConfig() {
-  return {
+  var config = {
     configVersion: CONFIG_VERSION,
     applicationVersion: APP_VERSION,
     propertyMatch: blankMapping(),
@@ -33,9 +34,11 @@ export function createEmptyMappingConfig() {
         targetColumnId: col.id,
         propertyMapping: blankMapping(),
         unitMapping: blankMapping(),
+        ignore: false,
       };
     }),
   };
+  return ensurePropertySummaryOnConfig(config);
 }
 
 export function cloneMappingConfig(config) {
@@ -84,17 +87,20 @@ export function normaliseMappingConfig(raw) {
         targetColumnId: col.id,
         propertyMapping: blankMapping(),
         unitMapping: blankMapping(),
+        ignore: false,
       };
     }
     return {
       targetColumnId: col.id,
       propertyMapping: normaliseSideMapping(existing.propertyMapping),
       unitMapping: normaliseSideMapping(existing.unitMapping),
+      ignore: existing.ignore === true,
     };
   });
 
   base.configVersion = Number(raw.configVersion) || CONFIG_VERSION;
   base.applicationVersion = String(raw.applicationVersion || APP_VERSION);
+  base.propertySummary = normalisePropertySummaryConfig(raw.propertySummary);
 
   return base;
 }
@@ -155,6 +161,8 @@ export function resolveSideStatus(mapping, columns) {
 }
 
 export function getColumnMappingStatus(entry, propertyParsed, unitParsed) {
+  if (entry && entry.ignore === true) return 'Ignored';
+
   var propStatus = resolveSideStatus(entry.propertyMapping, propertyParsed && propertyParsed.columns);
   var unitStatus = resolveSideStatus(entry.unitMapping, unitParsed && unitParsed.columns);
 
@@ -167,7 +175,7 @@ export function getColumnMappingStatus(entry, propertyParsed, unitParsed) {
 
   if (propMapped && unitMapped) return 'Mapped';
   if (propMapped || unitMapped) return 'Partially mapped';
-  return 'Blank';
+  return 'Unmapped';
 }
 
 export function getMappingSummary(config, propertyParsed, unitParsed) {
@@ -176,7 +184,8 @@ export function getMappingSummary(config, propertyParsed, unitParsed) {
   var missingMappings = 0;
   var mappedColumns = 0;
   var partiallyMapped = 0;
-  var blankColumns = 0;
+  var unmappedColumns = 0;
+  var ignoredColumns = 0;
 
   for (var i = 0; i < config.columnMappings.length; i += 1) {
     var entry = config.columnMappings[i];
@@ -184,10 +193,11 @@ export function getMappingSummary(config, propertyParsed, unitParsed) {
     if (entry.propertyMapping && entry.propertyMapping.type === 'source') propertyMappings += 1;
     if (entry.unitMapping && entry.unitMapping.type === 'source') unitMappings += 1;
 
-    if (status === 'Missing source') missingMappings += 1;
+    if (status === 'Ignored') ignoredColumns += 1;
+    else if (status === 'Missing source') missingMappings += 1;
     else if (status === 'Mapped') mappedColumns += 1;
     else if (status === 'Partially mapped') partiallyMapped += 1;
-    else blankColumns += 1;
+    else unmappedColumns += 1;
   }
 
   if (resolveSideStatus(config.propertyMatch, propertyParsed && propertyParsed.columns) === 'missing') {
@@ -204,7 +214,9 @@ export function getMappingSummary(config, propertyParsed, unitParsed) {
     missingMappings: missingMappings,
     mappedColumns: mappedColumns,
     partiallyMapped: partiallyMapped,
-    blankColumns: blankColumns,
+    unmappedColumns: unmappedColumns,
+    ignoredColumns: ignoredColumns,
+    blankColumns: unmappedColumns,
   };
 }
 
@@ -269,6 +281,7 @@ export function toEmbeddableConfig(config) {
     propertyMatch: normalised.propertyMatch,
     unitMatch: normalised.unitMatch,
     columnMappings: normalised.columnMappings,
+    propertySummary: normalised.propertySummary,
   };
 }
 

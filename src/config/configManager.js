@@ -5,6 +5,7 @@ import {
   STORAGE_KEY,
 } from './constants.js';
 import { defaultConfig } from './defaultConfig.js';
+import { ensurePropertySummaryOnConfig } from './propertySummaryColumns.js';
 
 const VALID_TARGET_IDS = new Set(
   STANDARD_TEMPLATE_COLUMNS.map(function (col) {
@@ -13,7 +14,7 @@ const VALID_TARGET_IDS = new Set(
 );
 
 export function cloneDefaultConfig() {
-  return JSON.parse(JSON.stringify(defaultConfig));
+  return ensurePropertySummaryOnConfig(JSON.parse(JSON.stringify(defaultConfig)));
 }
 
 function isValidSideMapping(mapping) {
@@ -130,7 +131,7 @@ export function loadRuntimeConfig() {
     return cloneDefaultConfig();
   }
 
-  return parsed;
+  return ensurePropertySummaryOnConfig(parsed);
 }
 
 export function saveRuntimeConfig(config) {
@@ -218,6 +219,6 @@ export function importConfigJson(file) {
       throw new Error('The configuration file is not valid: ' + check.errors.join(' '));
     }
 
-    return parsed;
+    return ensurePropertySummaryOnConfig(parsed);
   });
 }

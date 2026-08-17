@@ -88,12 +88,7 @@ export function getActiveOutputColumns(mappingConfig) {
       }
     }
 
-    var propertyActive =
-      entry && entry.propertyMapping && entry.propertyMapping.type === 'source';
-    var unitActive = entry && entry.unitMapping && entry.unitMapping.type === 'source';
-
-    // Both sides intentionally blank > omit column from generated workbook only.
-    if (!propertyActive && !unitActive) continue;
+    if (entry && entry.ignore === true) continue;
 
     columns.push({ id: templateCol.id, label: templateCol.label });
   }

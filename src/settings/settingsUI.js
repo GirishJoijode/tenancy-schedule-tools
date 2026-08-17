@@ -1,6 +1,5 @@
 import { APP_VERSION, CONFIG_VERSION, STANDARD_TEMPLATE_COLUMNS } from '../config/constants.js';
-import { cloneDefaultConfig } from '../config/configManager.js';
-import { exportConfigJson, importConfigJson } from '../config/configManager.js';
+import { cloneDefaultConfig, exportConfigJson, importConfigJson, validateConfig } from '../config/configManager.js';
 import {
   applyDefaultMatchFields,
   applyMappingConfig,
@@ -10,11 +9,23 @@ import {
   getMappingSummary,
   sourceMappingFromColumn,
 } from '../config/mapping.js';
-import { APP_STATE } from '../state.js';
+import {
+  PROPERTY_SUMMARY_COLUMNS,
+  getPropertySummaryMappingSummary,
+} from '../config/propertySummaryColumns.js';
+import {
+  getDefaultScheduleType,
+  getScheduleTypeById,
+  getScheduleTypeByStateKey,
+  SCHEDULE_TYPES,
+} from '../config/scheduleTypes.js';
+import { APP_STATE, PROPERTY_SUMMARY_STATE } from '../state.js';
 import { cssEscape, escapeAttr, escapeHtml, openConfirm } from '../ui/common.js';
 
 var draftConfig = null;
 var onConfigChanged = null;
+var settingsTemplateId = 'tenancy_schedule';
+var settingsDirty = false;
 
 export function setupSettingsUI(options) {
   options = options || {};
@@ -50,12 +61,17 @@ export function setupSettingsUI(options) {
     });
   });
 
-  document.getElementById('btn-apply-config').addEventListener('click', function () {
-    syncDraftFromDom();
-    applyMappingConfig(draftConfig);
-    showFeedback('Configuration applied and saved in this browser.', 'success');
-    notifyChanged();
-    renderAll();
+  populateSettingsTemplateSelect();
+  var templateSelect = document.getElementById('settings-template-select');
+  if (templateSelect) {
+    templateSelect.addEventListener('change', function () {
+      settingsTemplateId = templateSelect.value;
+      applySettingsTemplateView();
+    });
+  }
+
+  document.getElementById('btn-save-config').addEventListener('click', function () {
+    saveSettingsChanges();
   });
 
   document.getElementById('btn-export-config').addEventListener('click', function () {
@@ -64,6 +80,7 @@ export function setupSettingsUI(options) {
     notifyChanged();
     var result = exportConfigJson(draftConfig);
     if (result.ok) {
+      setDirty(false);
       showFeedback('Downloaded ' + result.filename + '.', 'success');
     } else {
       showFeedback('The configuration file could not be downloaded.', 'error');
@@ -91,6 +108,7 @@ export function setupSettingsUI(options) {
           draftConfig = cloneMappingConfig(imported);
           applyDefaultMatchFields(draftConfig, APP_STATE.property, APP_STATE.unit);
           applyMappingConfig(draftConfig);
+          setDirty(false);
           showFeedback('Configuration imported and applied.', 'success');
           notifyChanged();
           renderAll();
@@ -109,10 +127,11 @@ export function setupSettingsUI(options) {
   document.getElementById('btn-reset-mapping').addEventListener('click', function () {
     openConfirm(
       'Reset mapping?',
-      'This restores the original default column mappings and match fields that shipped with the application. Uploaded Excel files are not affected.',
+      'This restores the shipped Default and Property Only mappings. Uploaded Excel files are not affected.',
       function () {
         draftConfig = cloneMappingConfig(cloneDefaultConfig());
         applyMappingConfig(draftConfig);
+        setDirty(false);
         showFeedback('Mappings restored to the original defaults.', 'success');
         notifyChanged();
         renderAll();
@@ -127,19 +146,116 @@ export function setupSettingsUI(options) {
       filterMappingRows(filterInput.value);
     });
   }
+
+  var psFilterInput = document.getElementById('ps-mapping-filter');
+  if (psFilterInput) {
+    psFilterInput.addEventListener('input', function () {
+      filterPropertySummaryRows(psFilterInput.value);
+    });
+  }
 }
 
 function notifyChanged() {
   if (typeof onConfigChanged === 'function') onConfigChanged();
 }
 
+function populateSettingsTemplateSelect() {
+  var select = document.getElementById('settings-template-select');
+  if (!select) return;
+  select.innerHTML = SCHEDULE_TYPES.map(function (type) {
+    return (
+      '<option value="' +
+      escapeAttr(type.id) +
+      '">' +
+      escapeHtml(type.label) +
+      '</option>'
+    );
+  }).join('');
+}
+
+function getInitialSettingsTemplate() {
+  var app = document.getElementById('app');
+  if (app && app.classList.contains('app-mode-compare')) {
+    return getDefaultScheduleType();
+  }
+  return getScheduleTypeByStateKey(APP_STATE.scheduleType) || getDefaultScheduleType();
+}
+
+function applySettingsTemplateView() {
+  var type = getScheduleTypeById(settingsTemplateId) || getDefaultScheduleType();
+  var tenancyBlock = document.getElementById('tenancy-mapping-block');
+  var psBlock = document.getElementById('ps-mapping-block');
+  var matchingTab = document.getElementById('settings-matching-tab');
+  var matchingPanel = document.querySelector('[data-settings-panel="matching"]');
+  var isTenancy = type.mappingKind !== 'propertySummary';
+
+  if (tenancyBlock) tenancyBlock.classList.toggle('hidden', !isTenancy);
+  if (psBlock) psBlock.classList.toggle('hidden', isTenancy);
+  if (matchingTab) matchingTab.classList.toggle('hidden', !type.hasPropertyMatching);
+  if (matchingPanel && !type.hasPropertyMatching && !matchingPanel.classList.contains('hidden')) {
+    activateTab('mapping');
+  }
+}
+
+function setDirty(dirty) {
+  settingsDirty = Boolean(dirty);
+  var el = document.getElementById('settings-dirty-state');
+  if (!el) return;
+  el.classList.remove('is-dirty', 'is-saved');
+  if (settingsDirty) {
+    el.textContent = 'Unsaved changes';
+    el.classList.add('is-dirty');
+  } else {
+    el.textContent = '';
+  }
+}
+
+function markDirty() {
+  setDirty(true);
+}
+
+var savedStateTimer = null;
+
+function saveSettingsChanges() {
+  syncDraftFromDom();
+  var check = validateConfig(draftConfig);
+  if (!check.valid) {
+    showFeedback(
+      'The configuration is not valid: ' + (check.errors || []).join(' '),
+      'error'
+    );
+    return;
+  }
+  applyMappingConfig(draftConfig);
+  setDirty(false);
+  var el = document.getElementById('settings-dirty-state');
+  if (el) {
+    el.textContent = '\u2713 Configuration saved';
+    el.classList.add('is-saved');
+  }
+  if (savedStateTimer) clearTimeout(savedStateTimer);
+  savedStateTimer = setTimeout(function () {
+    if (!settingsDirty) setDirty(false);
+  }, 2500);
+  showFeedback('Configuration saved.', 'success');
+  notifyChanged();
+  renderAll();
+}
+
 function openSettings() {
   draftConfig = cloneMappingConfig(APP_STATE.mappingConfig || cloneDefaultConfig());
   applyDefaultMatchFields(draftConfig, APP_STATE.property, APP_STATE.unit);
 
+  var initial = getInitialSettingsTemplate();
+  settingsTemplateId = initial.id;
+  var templateSelect = document.getElementById('settings-template-select');
+  if (templateSelect) templateSelect.value = settingsTemplateId;
+
   var modal = document.getElementById('settings-modal');
   modal.classList.remove('hidden');
   activateTab('mapping');
+  applySettingsTemplateView();
+  setDirty(false);
   clearFeedback();
   renderAll();
 }
@@ -150,6 +266,10 @@ function closeSettings() {
 }
 
 function activateTab(tabId) {
+  var matchingTab = document.getElementById('settings-matching-tab');
+  if (tabId === 'matching' && matchingTab && matchingTab.classList.contains('hidden')) {
+    tabId = 'mapping';
+  }
   var modal = document.getElementById('settings-modal');
   modal.querySelectorAll('[data-settings-tab]').forEach(function (btn) {
     btn.classList.toggle('active', btn.dataset.settingsTab === tabId);
@@ -163,6 +283,8 @@ function renderAll() {
   if (!draftConfig) return;
   renderMappingSummary();
   renderMappingTable();
+  renderPropertySummarySummary();
+  renderPropertySummaryTable();
   renderMatchFields();
   renderConfigTab();
 }
@@ -191,21 +313,30 @@ function renderMappingSummary() {
     summary.standardColumns +
     '</strong> Standard Columns</span>' +
     '<span><strong>' +
-    summary.propertyMappings +
-    '</strong> Property mappings</span>' +
+    summary.mappedColumns +
+    '</strong> Mapped</span>' +
     '<span><strong>' +
-    summary.unitMappings +
-    '</strong> Unit mappings</span>' +
-    '<span class="' +
-    (summary.missingMappings ? 'summary-missing' : '') +
-    '">' +
-    '<strong>' +
-    summary.missingMappings +
-    '</strong> Missing mappings</span>';
+    summary.partiallyMapped +
+    '</strong> Partially mapped</span>' +
+    '<span><strong>' +
+    summary.unmappedColumns +
+    '</strong> Unmapped</span>' +
+    '<span><strong>' +
+    summary.ignoredColumns +
+    '</strong> Ignored</span>' +
+    (summary.missingMappings
+      ? '<span class="summary-missing"><strong>' +
+        summary.missingMappings +
+        '</strong> Missing source</span>'
+      : '');
 }
 
-function buildSourceOptionsHtml(fileType, selectedMapping) {
-  var parsed = APP_STATE[fileType];
+function getPropertyParsedForSettings() {
+  return PROPERTY_SUMMARY_STATE.property || APP_STATE.property;
+}
+
+function buildSourceOptionsHtml(fileType, selectedMapping, parsedOverride) {
+  var parsed = parsedOverride !== undefined ? parsedOverride : APP_STATE[fileType];
   var columns = (parsed && parsed.columns) || [];
   var selectedKey =
     selectedMapping && selectedMapping.type === 'source' ? selectedMapping.sourceKey : '';
@@ -270,9 +401,11 @@ function renderMappingTable() {
         targetColumnId: col.id,
         propertyMapping: blankMapping(),
         unitMapping: blankMapping(),
+        ignore: false,
       };
     }
 
+    var ignored = entry.ignore === true;
     var status = getColumnMappingStatus(entry, APP_STATE.property, APP_STATE.unit);
     var statusClass = statusClassName(status);
     var hidden = filterValue && col.label.toLowerCase().indexOf(filterValue) === -1 ? 'hidden' : '';
@@ -282,6 +415,7 @@ function renderMappingTable() {
       escapeAttr(col.id) +
       '" class="' +
       hidden +
+      (ignored ? ' is-ignored' : '') +
       '">' +
       '<td class="col-standard">' +
       '<div class="standard-label">' +
@@ -301,7 +435,9 @@ function renderMappingTable() {
       escapeAttr(col.id) +
       '" data-map-side="property" data-target-id="' +
       escapeAttr(col.id) +
-      '" class="source-select">' +
+      '" class="source-select"' +
+      (ignored ? ' disabled' : '') +
+      '>' +
       buildSourceOptionsHtml('property', entry.propertyMapping) +
       '</select>' +
       '</td>' +
@@ -315,9 +451,21 @@ function renderMappingTable() {
       escapeAttr(col.id) +
       '" data-map-side="unit" data-target-id="' +
       escapeAttr(col.id) +
-      '" class="source-select">' +
+      '" class="source-select"' +
+      (ignored ? ' disabled' : '') +
+      '>' +
       buildSourceOptionsHtml('unit', entry.unitMapping) +
       '</select>' +
+      '</td>' +
+      '<td class="col-ignore">' +
+      '<label class="ignore-check">' +
+      '<input type="checkbox" data-ignore-target="' +
+      escapeAttr(col.id) +
+      '"' +
+      (ignored ? ' checked' : '') +
+      ' title="Excluded from generated schedule" />' +
+      '<span class="sr-only">Ignore in output</span>' +
+      '</label>' +
       '</td>' +
       '<td class="col-status">' +
       '<span class="status-pill ' +
@@ -338,8 +486,18 @@ function renderMappingTable() {
       var side = select.dataset.mapSide;
       var key = select.value;
       updateDraftColumnMapping(targetId, side, key);
+      markDirty();
       renderMappingSummary();
       updateRowStatus(targetId);
+    });
+  });
+
+  tbody.querySelectorAll('input[data-ignore-target]').forEach(function (checkbox) {
+    checkbox.addEventListener('change', function () {
+      updateDraftIgnore(checkbox.dataset.ignoreTarget, checkbox.checked);
+      markDirty();
+      renderMappingTable();
+      renderMappingSummary();
     });
   });
 }
@@ -388,6 +546,7 @@ function updateDraftColumnMapping(targetId, side, sourceKey) {
       targetColumnId: targetId,
       propertyMapping: blankMapping(),
       unitMapping: blankMapping(),
+      ignore: false,
     };
     draftConfig.columnMappings.push(entry);
   }
@@ -396,10 +555,31 @@ function updateDraftColumnMapping(targetId, side, sourceKey) {
   entry[field] = mappingFromSelectValue(side, sourceKey, entry[field]);
 }
 
-function mappingFromSelectValue(fileType, sourceKey, previous) {
+function updateDraftIgnore(targetId, ignored) {
+  var entry = null;
+  for (var i = 0; i < draftConfig.columnMappings.length; i += 1) {
+    if (draftConfig.columnMappings[i].targetColumnId === targetId) {
+      entry = draftConfig.columnMappings[i];
+      break;
+    }
+  }
+  if (!entry) {
+    entry = {
+      targetColumnId: targetId,
+      propertyMapping: blankMapping(),
+      unitMapping: blankMapping(),
+      ignore: false,
+    };
+    draftConfig.columnMappings.push(entry);
+  }
+  entry.ignore = Boolean(ignored);
+}
+
+function mappingFromSelectValue(fileType, sourceKey, previous, parsedOverride) {
   if (!sourceKey) return blankMapping();
 
-  var cols = (APP_STATE[fileType] && APP_STATE[fileType].columns) || [];
+  var parsed = parsedOverride !== undefined ? parsedOverride : APP_STATE[fileType];
+  var cols = (parsed && parsed.columns) || [];
   var col = null;
   for (var i = 0; i < cols.length; i += 1) {
     if (cols[i].key === sourceKey) {
@@ -441,6 +621,7 @@ function renderMatchFields() {
       propSelect.value,
       draftConfig.propertyMatch
     );
+    markDirty();
   };
   unitSelect.onchange = function () {
     draftConfig.unitMatch = mappingFromSelectValue(
@@ -448,6 +629,7 @@ function renderMatchFields() {
       unitSelect.value,
       draftConfig.unitMatch
     );
+    markDirty();
   };
 }
 
@@ -458,11 +640,243 @@ function renderConfigTab() {
   document.getElementById('app-version-value').textContent = APP_VERSION;
 }
 
+function ensureDraftPropertySummary() {
+  if (!draftConfig.propertySummary || !Array.isArray(draftConfig.propertySummary.columnMappings)) {
+    draftConfig.propertySummary = {
+      columnMappings: PROPERTY_SUMMARY_COLUMNS.map(function (col) {
+        return { targetColumnId: col.id, propertyMapping: blankMapping(), ignore: false };
+      }),
+    };
+  }
+}
+
+function updateDraftPropertySummaryMapping(targetId, sourceKey) {
+  ensureDraftPropertySummary();
+  var entry = null;
+  for (var i = 0; i < draftConfig.propertySummary.columnMappings.length; i += 1) {
+    if (draftConfig.propertySummary.columnMappings[i].targetColumnId === targetId) {
+      entry = draftConfig.propertySummary.columnMappings[i];
+      break;
+    }
+  }
+  if (!entry) {
+    entry = { targetColumnId: targetId, propertyMapping: blankMapping(), ignore: false };
+    draftConfig.propertySummary.columnMappings.push(entry);
+  }
+  entry.propertyMapping = mappingFromSelectValue(
+    'property',
+    sourceKey,
+    entry.propertyMapping,
+    getPropertyParsedForSettings()
+  );
+}
+
+function renderPropertySummarySummary() {
+  var el = document.getElementById('ps-mapping-summary');
+  if (!el || !draftConfig) return;
+  var summary = getPropertySummaryMappingSummary(
+    draftConfig.propertySummary,
+    getPropertyParsedForSettings()
+  );
+  el.innerHTML =
+    '<span><strong>' +
+    summary.standardColumns +
+    '</strong> Standard Columns</span>' +
+    '<span><strong>' +
+    summary.propertyMappings +
+    '</strong> Mapped</span>' +
+    '<span><strong>' +
+    summary.unmappedColumns +
+    '</strong> Unmapped</span>' +
+    '<span><strong>' +
+    summary.ignoredColumns +
+    '</strong> Ignored</span>' +
+    (summary.missingMappings
+      ? '<span class="summary-missing"><strong>' +
+        summary.missingMappings +
+        '</strong> Missing source</span>'
+      : '');
+}
+
+function renderPropertySummaryTable() {
+  var tbody = document.getElementById('ps-mapping-table-body');
+  if (!tbody || !draftConfig) return;
+  ensureDraftPropertySummary();
+
+  var filterValue = ((document.getElementById('ps-mapping-filter') &&
+    document.getElementById('ps-mapping-filter').value) ||
+    ''
+  ).trim().toLowerCase();
+  var parsed = getPropertyParsedForSettings();
+
+  var rows = PROPERTY_SUMMARY_COLUMNS.map(function (col) {
+    var entry = null;
+    for (var i = 0; i < draftConfig.propertySummary.columnMappings.length; i += 1) {
+      if (draftConfig.propertySummary.columnMappings[i].targetColumnId === col.id) {
+        entry = draftConfig.propertySummary.columnMappings[i];
+        break;
+      }
+    }
+    if (!entry) {
+      entry = { targetColumnId: col.id, propertyMapping: blankMapping(), ignore: false };
+    }
+
+    var ignored = entry.ignore === true;
+    var mapping = entry.propertyMapping;
+    var status = ignored ? 'Ignored' : 'Unmapped';
+    if (!ignored && mapping && mapping.type === 'source') {
+      var found = parsed && parsed.columns && parsed.columns.some(function (c) {
+        return c.key === mapping.sourceKey;
+      });
+      status = !parsed || found ? 'Mapped' : 'Missing source';
+    }
+    var hidden = filterValue && col.label.toLowerCase().indexOf(filterValue) === -1 ? 'hidden' : '';
+
+    return (
+      '<tr data-ps-target-id="' +
+      escapeAttr(col.id) +
+      '" class="' +
+      hidden +
+      (ignored ? ' is-ignored' : '') +
+      '">' +
+      '<td class="col-standard">' +
+      '<div class="standard-label">' +
+      escapeHtml(col.label) +
+      '</div>' +
+      '<div class="standard-id">' +
+      escapeHtml(col.id) +
+      '</div>' +
+      '</td>' +
+      '<td>' +
+      '<label class="sr-only" for="ps-map-' +
+      escapeAttr(col.id) +
+      '">Property Level Source for ' +
+      escapeHtml(col.label) +
+      '</label>' +
+      '<select id="ps-map-' +
+      escapeAttr(col.id) +
+      '" data-ps-target-id="' +
+      escapeAttr(col.id) +
+      '" class="source-select"' +
+      (ignored ? ' disabled' : '') +
+      '>' +
+      buildSourceOptionsHtml('property', mapping, parsed) +
+      '</select>' +
+      '</td>' +
+      '<td class="col-ignore">' +
+      '<label class="ignore-check">' +
+      '<input type="checkbox" data-ps-ignore-target="' +
+      escapeAttr(col.id) +
+      '"' +
+      (ignored ? ' checked' : '') +
+      ' title="Excluded from generated schedule" />' +
+      '<span class="sr-only">Ignore in output</span>' +
+      '</label>' +
+      '</td>' +
+      '<td class="col-status">' +
+      '<span class="status-pill ' +
+      statusClassName(status) +
+      '">' +
+      escapeHtml(status) +
+      '</span>' +
+      '</td>' +
+      '</tr>'
+    );
+  }).join('');
+
+  tbody.innerHTML = rows;
+
+  tbody.querySelectorAll('select.source-select').forEach(function (select) {
+    select.addEventListener('change', function () {
+      updateDraftPropertySummaryMapping(select.dataset.psTargetId, select.value);
+      markDirty();
+      renderPropertySummarySummary();
+      updatePropertySummaryRowStatus(select.dataset.psTargetId);
+    });
+  });
+
+  tbody.querySelectorAll('input[data-ps-ignore-target]').forEach(function (checkbox) {
+    checkbox.addEventListener('change', function () {
+      updateDraftPropertySummaryIgnore(checkbox.dataset.psIgnoreTarget, checkbox.checked);
+      markDirty();
+      renderPropertySummaryTable();
+      renderPropertySummarySummary();
+    });
+  });
+}
+
+function updateDraftPropertySummaryIgnore(targetId, ignored) {
+  ensureDraftPropertySummary();
+  var entry = null;
+  for (var i = 0; i < draftConfig.propertySummary.columnMappings.length; i += 1) {
+    if (draftConfig.propertySummary.columnMappings[i].targetColumnId === targetId) {
+      entry = draftConfig.propertySummary.columnMappings[i];
+      break;
+    }
+  }
+  if (!entry) {
+    entry = { targetColumnId: targetId, propertyMapping: blankMapping(), ignore: false };
+    draftConfig.propertySummary.columnMappings.push(entry);
+  }
+  entry.ignore = Boolean(ignored);
+}
+
+function updatePropertySummaryRowStatus(targetId) {
+  if (!draftConfig || !draftConfig.propertySummary) return;
+  var entry = null;
+  for (var i = 0; i < draftConfig.propertySummary.columnMappings.length; i += 1) {
+    if (draftConfig.propertySummary.columnMappings[i].targetColumnId === targetId) {
+      entry = draftConfig.propertySummary.columnMappings[i];
+      break;
+    }
+  }
+  if (!entry) return;
+  var parsed = getPropertyParsedForSettings();
+  var mapping = entry.propertyMapping;
+  var status = entry.ignore === true ? 'Ignored' : 'Unmapped';
+  if (entry.ignore !== true && mapping && mapping.type === 'source') {
+    var found = parsed && parsed.columns && parsed.columns.some(function (c) {
+      return c.key === mapping.sourceKey;
+    });
+    status = !parsed || found ? 'Mapped' : 'Missing source';
+  }
+  var row = document.querySelector(
+    '#ps-mapping-table-body tr[data-ps-target-id="' + cssEscape(targetId) + '"]'
+  );
+  if (!row) return;
+  var pill = row.querySelector('.status-pill');
+  if (pill) {
+    pill.textContent = status;
+    pill.className = 'status-pill ' + statusClassName(status);
+  }
+}
+
+function filterPropertySummaryRows(query) {
+  var q = query.trim().toLowerCase();
+  document.querySelectorAll('#ps-mapping-table-body tr[data-ps-target-id]').forEach(function (row) {
+    var label = (row.querySelector('.standard-label') &&
+      row.querySelector('.standard-label').textContent) ||
+      '';
+    row.classList.toggle('hidden', Boolean(q) && label.toLowerCase().indexOf(q) === -1);
+  });
+}
+
 function syncDraftFromDom() {
   if (!draftConfig) return;
 
   document.querySelectorAll('#mapping-table-body select.source-select').forEach(function (select) {
     updateDraftColumnMapping(select.dataset.targetId, select.dataset.mapSide, select.value);
+  });
+
+  document.querySelectorAll('#ps-mapping-table-body select.source-select').forEach(function (select) {
+    updateDraftPropertySummaryMapping(select.dataset.psTargetId, select.value);
+  });
+
+  document.querySelectorAll('#mapping-table-body input[data-ignore-target]').forEach(function (checkbox) {
+    updateDraftIgnore(checkbox.dataset.ignoreTarget, checkbox.checked);
+  });
+  document.querySelectorAll('#ps-mapping-table-body input[data-ps-ignore-target]').forEach(function (checkbox) {
+    updateDraftPropertySummaryIgnore(checkbox.dataset.psIgnoreTarget, checkbox.checked);
   });
 
   var propSelect = document.getElementById('property-match-select');
@@ -500,6 +914,9 @@ function statusClassName(status) {
       return 'status-partial';
     case 'Missing source':
       return 'status-missing';
+    case 'Ignored':
+      return 'status-ignored';
+    case 'Unmapped':
     default:
       return 'status-blank';
   }
