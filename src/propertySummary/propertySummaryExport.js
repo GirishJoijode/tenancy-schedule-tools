@@ -1,12 +1,14 @@
-import * as XLSX from 'xlsx-js-style';
+import * as XLSXNamespace from 'xlsx-js-style';
+
+var XLSX = XLSXNamespace.utils ? XLSXNamespace : XLSXNamespace.default;
 import {
-  PROPERTY_SUMMARY_COL_WIDTHS,
-  PROPERTY_SUMMARY_NUM_FMT,
-  PROPERTY_SUMMARY_SHEET_NAME,
-  PROPERTY_SUMMARY_VALUATION_IDS,
-  PROPERTY_SUMMARY_VALUATION_TITLE,
-  PROPERTY_SUMMARY_WRAP_IDS,
-} from '../config/propertySummaryColumns.js';
+  PROPERTY_ONLY_COL_WIDTHS,
+  PROPERTY_ONLY_NUM_FMT,
+  PROPERTY_ONLY_SHEET_NAME,
+  PROPERTY_ONLY_VALUATION_IDS,
+  PROPERTY_ONLY_VALUATION_TITLE,
+  PROPERTY_ONLY_WRAP_IDS,
+} from '../templates/propertyOnly.js';
 
 const HEADER_FILL = { patternType: 'solid', fgColor: { rgb: 'FFD800' } };
 const HEADER_FONT = { bold: true, color: { rgb: '000000' }, name: 'Calibri', sz: 11 };
@@ -29,7 +31,7 @@ const MEDIUM_BORDER = {
 };
 
 function valueToCell(value, columnId, style) {
-  var numFmt = PROPERTY_SUMMARY_NUM_FMT[columnId] || null;
+  var numFmt = PROPERTY_ONLY_NUM_FMT[columnId] || null;
   var cellStyle = Object.assign({}, style);
   if (numFmt) cellStyle.numFmt = numFmt;
 
@@ -63,7 +65,7 @@ function findValuationSpan(columns) {
   var first = -1;
   var last = -1;
   for (var i = 0; i < columns.length; i += 1) {
-    if (PROPERTY_SUMMARY_VALUATION_IDS.indexOf(columns[i].id) !== -1) {
+    if (PROPERTY_ONLY_VALUATION_IDS.indexOf(columns[i].id) !== -1) {
       if (first === -1) first = i;
       last = i;
     }
@@ -109,7 +111,7 @@ export function buildPropertySummaryWorkbook(model) {
     var inSpan = span && c >= span.start && c <= span.end;
     ws[titleAddr] = {
       t: 's',
-      v: inSpan && c === span.start ? PROPERTY_SUMMARY_VALUATION_TITLE : '',
+      v: inSpan && c === span.start ? PROPERTY_ONLY_VALUATION_TITLE : '',
       s: inSpan ? titleStyle : {
         fill: HEADER_FILL,
         font: TITLE_FONT,
@@ -131,13 +133,13 @@ export function buildPropertySummaryWorkbook(model) {
     var values = rows[r].values || {};
     for (var d = 0; d < columns.length; d += 1) {
       var col = columns[d];
-      var wrap = Boolean(PROPERTY_SUMMARY_WRAP_IDS[col.id]);
+      var wrap = Boolean(PROPERTY_ONLY_WRAP_IDS[col.id]);
       var dataStyle = {
         font: DATA_FONT,
         border: THIN_BORDER,
         alignment: {
           vertical: 'center',
-          horizontal: PROPERTY_SUMMARY_NUM_FMT[col.id] ? 'right' : 'left',
+          horizontal: PROPERTY_ONLY_NUM_FMT[col.id] ? 'right' : 'left',
           wrapText: wrap,
         },
       };
@@ -160,7 +162,7 @@ export function buildPropertySummaryWorkbook(model) {
   }
 
   ws['!cols'] = columns.map(function (col) {
-    return { wch: PROPERTY_SUMMARY_COL_WIDTHS[col.id] || 14 };
+    return { wch: PROPERTY_ONLY_COL_WIDTHS[col.id] || 14 };
   });
   if (!columns.length) ws['!cols'] = [{ wch: 20 }];
 
@@ -168,6 +170,6 @@ export function buildPropertySummaryWorkbook(model) {
   ws['!views'] = [{ state: 'frozen', ySplit: 2, topLeftCell: 'A3', activeCell: 'A3' }];
 
   var wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, PROPERTY_SUMMARY_SHEET_NAME);
+  XLSX.utils.book_append_sheet(wb, ws, PROPERTY_ONLY_SHEET_NAME);
   return wb;
 }

@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "verify:config": "node _migration/verify-config.mjs"
+    "test": "node scripts/regression.mjs"
   },
   "dependencies": {
     "xlsx-js-style": "^1.2.0"

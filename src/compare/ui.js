@@ -2,7 +2,7 @@ import { COMPARE_OUTPUT_FILENAME } from '../config/constants.js';
 import { parseSourceFile } from '../excel/parser.js';
 import { normaliseJoinValue } from '../excel/parser.js';
 import { buildCompareWorkbook, downloadWorkbook } from '../excel/writer.js';
-import { APP_STATE, COMPARE_STATE } from '../state.js';
+import { COMPARE_STATE } from '../state.js';
 import { escapeHtml, formatCount, qs } from '../ui/common.js';
 import { formatCompareDisplay, runTenancyCompare } from './engine.js';
 
@@ -137,7 +137,7 @@ function refreshCompareUi() {
     hint.textContent = 'Upload both Current and Previous TS files to enable comparison.';
   } else if (!COMPARE_STATE.result) {
     hint.textContent =
-      'Ready to compare using Unit / TS mappings from Advanced Settings.';
+      'Ready to compare the fixed Default unit fields.';
   }
 
   if (!COMPARE_STATE.result) {
@@ -391,11 +391,7 @@ export function setupCompareTool() {
   document.querySelectorAll('#view-compare .dropzone').forEach(setupCompareDropzone);
 
   document.getElementById('compare-btn').addEventListener('click', function () {
-    var result = runTenancyCompare(
-      COMPARE_STATE.current,
-      COMPARE_STATE.previous,
-      APP_STATE.mappingConfig
-    );
+    var result = runTenancyCompare(COMPARE_STATE.current, COMPARE_STATE.previous);
     COMPARE_STATE.result = result;
     showCompareResult(result);
     refreshCompareUi();

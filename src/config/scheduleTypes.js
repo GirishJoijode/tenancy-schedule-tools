@@ -13,8 +13,6 @@ export const SCHEDULE_TYPES = [
     summary: 'Property and unit-level schedule',
     category: 'Standard',
     inputs: ['property', 'unit'],
-    hasPropertyMatching: true,
-    mappingKind: 'tenancy',
   },
   {
     id: 'property_summary',
@@ -25,8 +23,6 @@ export const SCHEDULE_TYPES = [
     summary: 'Property-only valuation summary',
     category: 'Standard',
     inputs: ['property'],
-    hasPropertyMatching: false,
-    mappingKind: 'propertySummary',
   },
 ];
 

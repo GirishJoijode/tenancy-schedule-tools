@@ -1,8 +1,6 @@
 export const APP_STATE = {
   property: null,
   unit: null,
-  mappingConfig: null,
-  mappingConfigured: false,
   scheduleType: 'tenancy',
 };
 

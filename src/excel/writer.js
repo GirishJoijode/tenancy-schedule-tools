@@ -1,10 +1,11 @@
-import * as XLSX from 'xlsx-js-style';
+import * as XLSXNamespace from 'xlsx-js-style';
+
+var XLSX = XLSXNamespace.utils ? XLSXNamespace : XLSXNamespace.default;
 import { DATE_COMPARE_IDS } from '../config/constants.js';
+import { DEFAULT_SCHEDULE_COLUMNS } from '../templates/defaultSchedule.js';
 
 const HEADER_FILL = { patternType: 'solid', fgColor: { rgb: '002060' } };
 const HEADER_FONT = { bold: true, color: { rgb: 'FFFFFF' }, name: 'Calibri', sz: 11 };
-const PROPERTY_FILL = { patternType: 'solid', fgColor: { rgb: 'D9D9D9' } };
-const PROPERTY_FONT = { bold: true, name: 'Calibri', sz: 11, color: { rgb: '000000' } };
 const UNIT_FONT = { bold: false, name: 'Calibri', sz: 11, color: { rgb: '000000' } };
 
 const BORDER_COLOR = { rgb: 'BFBFBF' };
@@ -24,78 +25,67 @@ const HEADER_BORDER = {
   right: { style: 'thin', color: HEADER_BORDER_COLOR },
 };
 
-const PROPERTY_BORDER = {
-  top: { style: 'medium', color: { rgb: '595959' } },
-  bottom: { style: 'thin', color: BORDER_COLOR },
-  left: { style: 'thin', color: BORDER_COLOR },
-  right: { style: 'thin', color: BORDER_COLOR },
-};
+function excelNumberFormat(format) {
+  if (!format) return null;
+  return String(format).replace(/£/g, '\u00a3');
+}
 
-const COLUMN_NUM_FMT = {
-  area_sqft: '#,##0',
-  contracted_rent_pa: '\u00a3#,##0',
-  contracted_rent_psf: '\u00a30.00',
-  deemed_rent_psf: '\u00a30.00',
-  market_rent_pa: '\u00a3#,##0',
-  market_rent_psf: '\u00a30.00',
-  rent_free_month: '0',
-  expiry_void_month: '0',
-  rent_free_expiry_month: '0',
-  cap_rate: '0.00%',
-  niy: '0.00%',
-  ney: '0.00%',
-  ry: '0.00%',
-  cv_psf: '\u00a30',
-  cap_ex: '\u00a3#,##0;[Red]-\u00a3#,##0',
-  fair_value_april_2024: '\u00a3#,##0',
-  fair_value_march_2026: '\u00a3#,##0',
-  pct_change_26_april_24: '0.00%',
-  pct_change_x_ytd: '0.00%',
-  start_date: 'dd/mm/yyyy',
-  review_date: 'dd/mm/yyyy',
-  expiry_date: 'dd/mm/yyyy',
-  break_date: 'dd/mm/yyyy',
-};
+var COLUMN_NUM_FMT = {};
+for (var formatIndex = 0; formatIndex < DEFAULT_SCHEDULE_COLUMNS.length; formatIndex += 1) {
+  var formattedColumn = DEFAULT_SCHEDULE_COLUMNS[formatIndex];
+  var excelFormat = excelNumberFormat(formattedColumn.format);
+  if (excelFormat) COLUMN_NUM_FMT[formattedColumn.id] = excelFormat;
+}
 
 const COLUMN_WIDTHS = {
-  property_reference: 14,
-  town: 14,
-  address: 38,
-  tenure_uk: 8,
+  property_reference: 18,
+  valuation: 11,
+  town: 16,
+  address: 46,
+  tenure_uk: 10,
   area_sqft: 12,
-  unit: 30,
-  tenant_name: 30,
+  unit: 16,
+  tenant_name: 36,
   start_date: 12,
   review_date: 12,
   expiry_date: 12,
   break_date: 12,
   mwault_year: 10,
-  contracted_rent_pa: 14,
-  contracted_rent_psf: 12,
-  deemed_rent_psf: 12,
-  market_rent_pa: 14,
-  market_rent_psf: 12,
-  current_void: 11,
-  rent_free_month: 10,
-  expiry_void_month: 10,
-  rent_free_expiry_month: 11,
-  cap_rate: 9,
-  niy: 8,
-  ney: 8,
-  ry: 8,
-  cv_psf: 10,
-  cap_ex: 12,
-  fair_value_april_2024: 14,
-  fair_value_march_2026: 14,
-  pct_change_26_april_24: 12,
-  pct_change_x_ytd: 11,
-  comments: 36,
+  contracted_rent_pa: 15,
+  contracted_rent_psf: 13,
+  deemed_rent_psf: 13,
+  market_rent_pa: 15,
+  market_rent_psf: 13,
+  current_void: 12,
+  rent_free_month: 11,
+  expiry_void_month: 11,
+  rent_free_expiry_month: 12,
+  cap_rate: 10,
+  niy: 9,
+  ney: 9,
+  ry: 9,
+  cv_psf: 11,
+  cap_ex: 13,
+  fair_value: 16,
+  fair_value_march_2026: 16,
+  pct_change_26_april_24: 14,
+  pct_change_x_ytd: 12,
+  comments: 42,
 };
 
-const DATE_COLUMN_IDS = new Set(['start_date', 'review_date', 'expiry_date', 'break_date']);
-const WRAP_COLUMN_IDS = new Set(['comments', 'address', 'unit', 'tenant_name']);
+const LEFT_COLUMN_IDS = new Set([
+  'property_reference',
+  'address',
+  'tenant_name',
+]);
 
 export function getNumberFormat(columnId, value) {
+  if (columnId === 'break_date') {
+    if (typeof value === 'number' && Number.isFinite(value)) return '0.00';
+    if (value instanceof Date && !Number.isNaN(value.getTime())) return 'dd/mm/yyyy';
+    return null;
+  }
+
   if (columnId === 'current_void') {
     if (value instanceof Date && !Number.isNaN(value.getTime())) return 'dd/mm/yyyy';
     if (typeof value === 'number' && Number.isFinite(value)) return '0';
@@ -114,6 +104,18 @@ export function valueToCell(value, baseStyle, columnId) {
   columnId = columnId || '';
   var numFmt = getNumberFormat(columnId, value);
   var style = numFmt ? Object.assign({}, baseStyle, { numFmt: numFmt }) : Object.assign({}, baseStyle);
+
+  if (
+    columnId === 'valuation' &&
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value > 20000 &&
+    value < 80000
+  ) {
+    var serialMs = Math.round((value - 25569) * 86400 * 1000);
+    var serialDate = new Date(serialMs);
+    value = new Date(serialDate.getUTCFullYear(), serialDate.getUTCMonth(), serialDate.getUTCDate());
+  }
 
   if (value === null || value === undefined || value === '') {
     return { t: 's', v: '', s: style };
@@ -149,39 +151,98 @@ export function valueToCell(value, baseStyle, columnId) {
   };
 }
 
-export function buildDataCellStyle(columnId, isProperty) {
-  var wrap = WRAP_COLUMN_IDS.has(columnId);
-  var horizontal =
-    DATE_COLUMN_IDS.has(columnId) || COLUMN_NUM_FMT[columnId] || columnId === 'current_void'
-      ? 'right'
-      : 'left';
+function scheduleHorizontalAlign(columnId) {
+  if (LEFT_COLUMN_IDS.has(columnId)) return 'left';
+  return 'center';
+}
 
+export function buildDataCellStyle(columnId, isProperty) {
   return {
-    font: isProperty ? PROPERTY_FONT : UNIT_FONT,
-    fill: isProperty ? PROPERTY_FILL : undefined,
-    border: isProperty ? PROPERTY_BORDER : THIN_BORDER,
+    font: isProperty ? SCHEDULE_PROPERTY_FONT : SCHEDULE_UNIT_FONT,
+    fill: isProperty ? SCHEDULE_PROPERTY_FILL : SCHEDULE_WHITE_FILL,
+    border: isProperty ? SCHEDULE_PROPERTY_BORDER : SCHEDULE_UNIT_BORDER,
     alignment: {
       vertical: 'center',
-      horizontal: horizontal,
-      wrapText: wrap,
+      horizontal: scheduleHorizontalAlign(columnId),
+      wrapText: columnId === 'comments',
     },
   };
 }
 
+var SCHEDULE_BLACK = { rgb: '000000' };
+var SCHEDULE_HEADER_FONT = { bold: true, color: { rgb: 'FFFFFF' }, name: 'Arial', sz: 8 };
+var SCHEDULE_PROPERTY_FONT = { bold: true, name: 'Arial', sz: 8, color: { rgb: '000000' } };
+var SCHEDULE_UNIT_FONT = { bold: false, name: 'Arial', sz: 8, color: { rgb: '000000' } };
+
+var SCHEDULE_HEADER_BORDER = {
+  top: { style: 'thin', color: SCHEDULE_BLACK },
+  bottom: { style: 'medium', color: SCHEDULE_BLACK },
+  left: { style: 'thin', color: SCHEDULE_BLACK },
+  right: { style: 'thin', color: SCHEDULE_BLACK },
+};
+
+var SCHEDULE_SECTOR_EDGE = { style: 'medium', color: SCHEDULE_BLACK };
+
+function sectorBandBorder(columnIndex, columnCount) {
+  var border = {
+    top: SCHEDULE_SECTOR_EDGE,
+    bottom: SCHEDULE_SECTOR_EDGE,
+  };
+  if (columnIndex === 0) border.left = SCHEDULE_SECTOR_EDGE;
+  if (columnIndex === columnCount - 1) border.right = SCHEDULE_SECTOR_EDGE;
+  return border;
+}
+
+function summaryBandStyle(columnIndex, columnCount, horizontal, indent) {
+  return {
+    fill: HEADER_FILL,
+    font: SCHEDULE_HEADER_FONT,
+    border: sectorBandBorder(columnIndex, columnCount),
+    alignment: {
+      vertical: 'center',
+      horizontal: horizontal,
+      indent: indent || 0,
+      wrapText: false,
+    },
+  };
+}
+
+var SCHEDULE_PROPERTY_BORDER = {
+  top: { style: 'medium', color: SCHEDULE_BLACK },
+  bottom: { style: 'thin', color: SCHEDULE_BLACK },
+  left: { style: 'thin', color: SCHEDULE_BLACK },
+  right: { style: 'thin', color: SCHEDULE_BLACK },
+};
+
+var SCHEDULE_UNIT_BORDER = {
+  top: { style: 'thin', color: SCHEDULE_BLACK },
+  bottom: { style: 'thin', color: SCHEDULE_BLACK },
+  left: { style: 'thin', color: SCHEDULE_BLACK },
+  right: { style: 'thin', color: SCHEDULE_BLACK },
+};
+
+var SCHEDULE_PROPERTY_FILL = { patternType: 'solid', fgColor: { rgb: 'F2F0ED' } };
+var SCHEDULE_WHITE_FILL = { patternType: 'solid', fgColor: { rgb: 'FFFFFF' } };
+var SCHEDULE_HEADER_HEIGHT = 40;
+var SCHEDULE_SEPARATOR_HEIGHT = 8;
+var SCHEDULE_SECTOR_HEIGHT = 18;
+var SCHEDULE_DATA_HEIGHT = 24;
+
 export function buildTenancyScheduleSheet(model) {
   var columns = model.columns;
   var colCount = columns.length;
-  var rowCount = 1 + model.scheduleRows.length;
+  var scheduleRows = model.scheduleRows || [];
+  var rowCount = 2 + scheduleRows.length;
   var ws = {};
 
   if (colCount === 0) {
     ws.A1 = {
       t: 's',
-      v: 'No output columns configured (all Standardised Template mappings are blank).',
+      v: 'No output columns are defined.',
       s: {
-        font: HEADER_FONT,
+        font: SCHEDULE_HEADER_FONT,
         fill: HEADER_FILL,
-        border: HEADER_BORDER,
+        border: SCHEDULE_HEADER_BORDER,
       },
     };
     ws['!ref'] = 'A1';
@@ -196,8 +257,8 @@ export function buildTenancyScheduleSheet(model) {
       v: columns[c].label,
       s: {
         fill: HEADER_FILL,
-        font: HEADER_FONT,
-        border: HEADER_BORDER,
+        font: SCHEDULE_HEADER_FONT,
+        border: SCHEDULE_HEADER_BORDER,
         alignment: {
           vertical: 'center',
           horizontal: 'center',
@@ -207,16 +268,69 @@ export function buildTenancyScheduleSheet(model) {
     };
   }
 
-  for (var r = 0; r < model.scheduleRows.length; r += 1) {
-    var row = model.scheduleRows[r];
-    var isProperty = row.kind === 'property';
+  for (var blankCol = 0; blankCol < colCount; blankCol += 1) {
+    ws[XLSX.utils.encode_cell({ r: 1, c: blankCol })] = {
+      t: 's',
+      v: '',
+      s: {
+        font: SCHEDULE_UNIT_FONT,
+        alignment: { vertical: 'center', horizontal: 'left', wrapText: false },
+      },
+    };
+  }
 
+  var merges = [];
+
+  for (var r = 0; r < scheduleRows.length; r += 1) {
+    var row = scheduleRows[r];
+    var excelRow = r + 2;
+
+    if (row.kind === 'sector') {
+      merges.push({
+        s: { r: excelRow, c: 0 },
+        e: { r: excelRow, c: Math.max(colCount - 1, 0) },
+      });
+      for (var sc = 0; sc < colCount; sc += 1) {
+        var sectorAddr = XLSX.utils.encode_cell({ r: excelRow, c: sc });
+        ws[sectorAddr] = {
+          t: 's',
+          v: sc === 0 ? row.sector : '',
+          s: summaryBandStyle(sc, colCount, 'left', sc === 0 ? 1 : 0),
+        };
+      }
+      continue;
+    }
+
+    if (row.kind === 'separator') {
+      for (var sepCol = 0; sepCol < colCount; sepCol += 1) {
+        ws[XLSX.utils.encode_cell({ r: excelRow, c: sepCol })] = {
+          t: 's',
+          v: '',
+          s: {
+            font: SCHEDULE_UNIT_FONT,
+            alignment: { vertical: 'center', horizontal: 'left', wrapText: false },
+          },
+        };
+      }
+      continue;
+    }
+
+    if (row.kind === 'sectorTotal' || row.kind === 'grandTotal') {
+      for (var tc = 0; tc < colCount; tc += 1) {
+        var totalId = columns[tc].id;
+        var totalValue = row.values[totalId];
+        var totalStyle = summaryBandStyle(tc, colCount, scheduleHorizontalAlign(totalId), 0);
+        ws[XLSX.utils.encode_cell({ r: excelRow, c: tc })] = valueToCell(totalValue, totalStyle, totalId);
+      }
+      continue;
+    }
+
+    var isProperty = row.kind === 'property';
     for (var dc = 0; dc < colCount; dc += 1) {
       var colId = columns[dc].id;
-      var dataAddr = XLSX.utils.encode_cell({ r: r + 1, c: dc });
-      var style = buildDataCellStyle(colId, isProperty);
-      if (!isProperty) delete style.fill;
-      ws[dataAddr] = valueToCell(row.values[colId], style, colId);
+      var dataAddr = XLSX.utils.encode_cell({ r: excelRow, c: dc });
+      var cellStyle = buildDataCellStyle(colId, isProperty);
+      ws[dataAddr] = valueToCell(row.values[colId], cellStyle, colId);
     }
   }
 
@@ -225,20 +339,22 @@ export function buildTenancyScheduleSheet(model) {
     e: { r: Math.max(rowCount - 1, 0), c: Math.max(colCount - 1, 0) },
   });
 
+  if (merges.length) ws['!merges'] = merges;
+
   ws['!freeze'] = {
     xSplit: 0,
-    ySplit: 1,
-    topLeftCell: 'A2',
+    ySplit: 2,
+    topLeftCell: 'A3',
     activePane: 'bottomLeft',
     state: 'frozen',
   };
-  ws['!views'] = [{ state: 'frozen', ySplit: 1, topLeftCell: 'A2', activeCell: 'A2' }];
+  ws['!views'] = [{ state: 'frozen', ySplit: 2, topLeftCell: 'A3', activeCell: 'A3' }];
 
-  if (colCount > 0) {
+  if (colCount > 0 && rowCount > 2) {
     ws['!autofilter'] = {
       ref: XLSX.utils.encode_range({
         s: { r: 0, c: 0 },
-        e: { r: Math.max(rowCount - 1, 0), c: colCount - 1 },
+        e: { r: rowCount - 1, c: colCount - 1 },
       }),
     };
   }
@@ -248,13 +364,26 @@ export function buildTenancyScheduleSheet(model) {
       wch:
         COLUMN_WIDTHS[col.id] != null
           ? COLUMN_WIDTHS[col.id]
-          : Math.min(22, Math.max(10, String(col.label).length + 2)),
+          : col.width || Math.min(22, Math.max(10, String(col.label).length + 2)),
     };
   });
 
-  var rowProps = [{ hpt: 36 }];
-  for (var ri = 0; ri < model.scheduleRows.length; ri += 1) {
-    rowProps.push({ hpt: 18 });
+  var rowProps = [
+    { hpt: SCHEDULE_HEADER_HEIGHT, customHeight: true },
+    { hpt: SCHEDULE_SEPARATOR_HEIGHT, customHeight: true },
+  ];
+  for (var ri = 0; ri < scheduleRows.length; ri += 1) {
+    rowProps.push({
+      hpt:
+        scheduleRows[ri].kind === 'sector' ||
+        scheduleRows[ri].kind === 'sectorTotal' ||
+        scheduleRows[ri].kind === 'grandTotal'
+          ? SCHEDULE_SECTOR_HEIGHT
+          : scheduleRows[ri].kind === 'separator'
+            ? SCHEDULE_SEPARATOR_HEIGHT
+            : SCHEDULE_DATA_HEIGHT,
+      customHeight: true,
+    });
   }
   ws['!rows'] = rowProps;
 
@@ -262,13 +391,7 @@ export function buildTenancyScheduleSheet(model) {
 }
 
 export function buildUnmatchedSheet(unmatchedRows) {
-  var headers = [
-    'Original Excel Row',
-    'Configured Unit Match Value',
-    'Property Name',
-    'Tenant Name',
-    'Suite',
-  ];
+  var headers = ['Original Excel Row', 'Property Name', 'Tenant Name', 'Suite'];
 
   var ws = {};
 
@@ -288,13 +411,7 @@ export function buildUnmatchedSheet(unmatchedRows) {
 
   for (var r = 0; r < unmatchedRows.length; r += 1) {
     var row = unmatchedRows[r];
-    var values = [
-      row.originalExcelRow,
-      row.matchValue,
-      row.propertyName,
-      row.tenantName,
-      row.suite,
-    ];
+    var values = [row.originalExcelRow, row.matchValue || row.propertyName, row.tenantName, row.suite];
     for (var dc = 0; dc < values.length; dc += 1) {
       var dataAddr = XLSX.utils.encode_cell({ r: r + 1, c: dc });
       var style = {
@@ -318,7 +435,7 @@ export function buildUnmatchedSheet(unmatchedRows) {
       e: { r: lastRow, c: headers.length - 1 },
     }),
   };
-  ws['!cols'] = [{ wch: 18 }, { wch: 32 }, { wch: 28 }, { wch: 28 }, { wch: 22 }];
+  ws['!cols'] = [{ wch: 18 }, { wch: 32 }, { wch: 28 }, { wch: 22 }];
   ws['!rows'] = [{ hpt: 28 }];
 
   return ws;
@@ -338,16 +455,168 @@ export function buildWorkbookFromModel(model) {
   return wb;
 }
 
-export function workbookToArrayBuffer(workbook) {
-  return XLSX.write(workbook, {
+var CRC32_TABLE = new Uint32Array(256);
+for (var crcIndex = 0; crcIndex < 256; crcIndex += 1) {
+  var crcValue = crcIndex;
+  for (var crcBit = 0; crcBit < 8; crcBit += 1) {
+    crcValue = crcValue & 1 ? 0xedb88320 ^ (crcValue >>> 1) : crcValue >>> 1;
+  }
+  CRC32_TABLE[crcIndex] = crcValue >>> 0;
+}
+
+function readU16(bytes, offset) {
+  return bytes[offset] | (bytes[offset + 1] << 8);
+}
+
+function readU32(bytes, offset) {
+  return (
+    (bytes[offset] |
+      (bytes[offset + 1] << 8) |
+      (bytes[offset + 2] << 16) |
+      (bytes[offset + 3] << 24)) >>>
+    0
+  );
+}
+
+function writeU16(bytes, offset, value) {
+  bytes[offset] = value & 255;
+  bytes[offset + 1] = (value >>> 8) & 255;
+}
+
+function writeU32(bytes, offset, value) {
+  bytes[offset] = value & 255;
+  bytes[offset + 1] = (value >>> 8) & 255;
+  bytes[offset + 2] = (value >>> 16) & 255;
+  bytes[offset + 3] = (value >>> 24) & 255;
+}
+
+function indexOfBytes(haystack, needle) {
+  for (var i = 0; i <= haystack.length - needle.length; i += 1) {
+    var matched = true;
+    for (var j = 0; j < needle.length; j += 1) {
+      if (haystack[i + j] !== needle[j]) {
+        matched = false;
+        break;
+      }
+    }
+    if (matched) return i;
+  }
+  return -1;
+}
+
+function crc32(bytes) {
+  var crc = 0xffffffff;
+  for (var i = 0; i < bytes.length; i += 1) {
+    crc = CRC32_TABLE[(crc ^ bytes[i]) & 255] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function findStoredZipEntry(bytes, targetName) {
+  var offset = 0;
+  var decoder = new TextDecoder();
+  while (offset + 30 < bytes.length && readU32(bytes, offset) === 0x04034b50) {
+    var method = readU16(bytes, offset + 8);
+    var compressedSize = readU32(bytes, offset + 18);
+    var nameLength = readU16(bytes, offset + 26);
+    var extraLength = readU16(bytes, offset + 28);
+    var name = decoder.decode(bytes.subarray(offset + 30, offset + 30 + nameLength));
+    var dataStart = offset + 30 + nameLength + extraLength;
+    if (name === targetName) {
+      return {
+        offset: offset,
+        method: method,
+        compressedSize: compressedSize,
+        dataStart: dataStart,
+      };
+    }
+    offset = dataStart + compressedSize;
+  }
+  return null;
+}
+
+function injectFrozenHeader(arrayBuffer, ySplit) {
+  var bytes = arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer);
+  var entry = findStoredZipEntry(bytes, 'xl/worksheets/sheet1.xml');
+  if (!entry || entry.method !== 0) return bytes;
+
+  var marker = new TextEncoder().encode('<sheetViews><sheetView workbookViewId="0"/></sheetViews>');
+  var topLeft = 'A' + (ySplit + 1);
+  var replacement = new TextEncoder().encode(
+    '<sheetViews><sheetView showGridLines="0" workbookViewId="0"><pane ySplit="' +
+      ySplit +
+      '" topLeftCell="' +
+      topLeft +
+      '" activePane="bottomLeft" state="frozen"/><selection pane="bottomLeft" activeCell="' +
+      topLeft +
+      '" sqref="' +
+      topLeft +
+      '"/></sheetView></sheetViews>'
+  );
+  var sheet = bytes.subarray(entry.dataStart, entry.dataStart + entry.compressedSize);
+  var markerAt = indexOfBytes(sheet, marker);
+  if (markerAt < 0) return bytes;
+
+  var delta = replacement.length - marker.length;
+  var next = new Uint8Array(bytes.length + delta);
+  var insertAt = entry.dataStart + markerAt;
+  next.set(bytes.subarray(0, insertAt), 0);
+  next.set(replacement, insertAt);
+  next.set(bytes.subarray(insertAt + marker.length), insertAt + replacement.length);
+
+  var newSize = entry.compressedSize + delta;
+  var newSheet = next.subarray(entry.dataStart, entry.dataStart + newSize);
+  writeU32(next, entry.offset + 14, crc32(newSheet));
+  writeU32(next, entry.offset + 18, newSize);
+  writeU32(next, entry.offset + 22, newSize);
+
+  var eocd = -1;
+  var scanFrom = Math.max(0, next.length - 22 - 65535);
+  for (var scan = next.length - 22; scan >= scanFrom; scan -= 1) {
+    if (readU32(next, scan) === 0x06054b50) {
+      eocd = scan;
+      break;
+    }
+  }
+  if (eocd < 0) return bytes;
+
+  var centralSize = readU32(next, eocd + 12);
+  var centralOffset = readU32(next, eocd + 16);
+  var movedCentral = centralOffset + delta;
+  var cursor = movedCentral;
+  var centralEnd = movedCentral + centralSize;
+  while (cursor + 46 <= centralEnd && readU32(next, cursor) === 0x02014b50) {
+    var centralNameLength = readU16(next, cursor + 28);
+    var centralExtraLength = readU16(next, cursor + 30);
+    var centralCommentLength = readU16(next, cursor + 32);
+    var localOffset = readU32(next, cursor + 42);
+    if (localOffset === entry.offset) {
+      writeU32(next, cursor + 16, crc32(newSheet));
+      writeU32(next, cursor + 20, newSize);
+      writeU32(next, cursor + 24, newSize);
+    } else if (localOffset > entry.offset) {
+      writeU32(next, cursor + 42, localOffset + delta);
+    }
+    cursor += 46 + centralNameLength + centralExtraLength + centralCommentLength;
+  }
+  writeU32(next, eocd + 16, movedCentral);
+  return next;
+}
+
+export function workbookToArrayBuffer(workbook, options) {
+  var buffer = XLSX.write(workbook, {
     bookType: 'xlsx',
     type: 'array',
     cellDates: true,
   });
+  if (options && options.freezeHeaderRows) {
+    return injectFrozenHeader(buffer, options.freezeHeaderRows);
+  }
+  return buffer;
 }
 
-export function downloadWorkbook(workbook, filename) {
-  var buffer = workbookToArrayBuffer(workbook);
+export function downloadWorkbook(workbook, filename, options) {
+  var buffer = workbookToArrayBuffer(workbook, options);
   var blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   });

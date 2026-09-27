@@ -3,26 +3,18 @@ import { escapeHtml } from './common.js';
 
 export function setAppMode(mode) {
   var app = document.getElementById('app');
-  var stdView = document.getElementById('view-standardiser');
-  var cmpView = document.getElementById('view-compare');
-  var stdBtn = document.getElementById('mode-standardiser-btn');
-  var cmpBtn = document.getElementById('mode-compare-btn');
-  var isCompare = mode === 'compare';
-
-  app.classList.toggle('app-mode-compare', isCompare);
-  app.classList.toggle('app-mode-standardiser', !isCompare);
-  stdView.classList.toggle('hidden', isCompare);
-  cmpView.classList.toggle('hidden', !isCompare);
-  if (stdBtn) {
-    stdBtn.classList.toggle('active', !isCompare);
-    stdBtn.setAttribute('aria-selected', !isCompare ? 'true' : 'false');
-    stdBtn.setAttribute('tabindex', isCompare ? '-1' : '0');
-  }
-  if (cmpBtn) {
-    cmpBtn.classList.toggle('active', isCompare);
-    cmpBtn.setAttribute('aria-selected', isCompare ? 'true' : 'false');
-    cmpBtn.setAttribute('tabindex', isCompare ? '0' : '-1');
-  }
+  APP_TOOLS.forEach(function (tool) {
+    var active = tool.mode === mode;
+    var view = document.getElementById(tool.viewId);
+    var button = document.getElementById(tool.buttonId);
+    if (view) view.classList.toggle('hidden', !active);
+    if (app) app.classList.toggle('app-mode-' + tool.mode, active);
+    if (button) {
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-selected', active ? 'true' : 'false');
+      button.setAttribute('tabindex', active ? '0' : '-1');
+    }
+  });
   document.title = 'Tenancy Schedule Tools';
 }
 

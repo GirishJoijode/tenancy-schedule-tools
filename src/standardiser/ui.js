@@ -1,8 +1,6 @@
-import { applyDefaultMatchFields, isMappingConfigured } from '../config/mapping.js';
 import { parseSourceFile } from '../excel/parser.js';
 import { APP_STATE } from '../state.js';
 import { escapeHtml, formatCount, qs, setStatusLines } from '../ui/common.js';
-import { refreshSettingsIfOpen } from '../settings/settingsUI.js';
 import { generateStandardisedSchedule } from './generator.js';
 import { analyseMatching } from './transform.js';
 
@@ -17,32 +15,7 @@ function getFileStatusLines(parsed, singular, plural) {
 }
 
 function getMappingStatusLines() {
-  var config = APP_STATE.mappingConfig;
-  if (!config) return ['Not configured'];
-
-  var hasFiles = Boolean(APP_STATE.property && APP_STATE.unit);
-
-  if (!hasFiles) {
-    if (
-      (config.propertyMatch && config.propertyMatch.type === 'source') ||
-      (config.unitMatch && config.unitMatch.type === 'source')
-    ) {
-      return ['Configuration loaded'];
-    }
-    var hasAny = config.columnMappings.some(function (e) {
-      return (
-        (e.propertyMapping && e.propertyMapping.type === 'source') ||
-        (e.unitMapping && e.unitMapping.type === 'source')
-      );
-    });
-    return [hasAny ? 'Configuration loaded' : 'Not configured'];
-  }
-
-  if (APP_STATE.mappingConfigured) {
-    return ['\u2713 Configured'];
-  }
-
-  return ['\u26a0 Mapping requires attention'];
+  return ['Fixed template'];
 }
 
 export function setupDropzone(dropzone) {
@@ -92,14 +65,9 @@ export function setupDropzone(dropzone) {
       .then(function (parsed) {
         APP_STATE[fileType] = parsed;
 
-        if (APP_STATE.mappingConfig) {
-          applyDefaultMatchFields(APP_STATE.mappingConfig, APP_STATE.property, APP_STATE.unit);
-        }
-
         showSuccess(parsed);
         clearGenerateResult();
         refreshStatus();
-        refreshSettingsIfOpen();
       })
       .catch(function (err) {
         APP_STATE[fileType] = null;
@@ -110,7 +78,6 @@ export function setupDropzone(dropzone) {
         showError(message);
         clearGenerateResult();
         refreshStatus();
-        refreshSettingsIfOpen();
         console.error('[' + fileType + '] parse failed:', err);
       });
   }
@@ -354,11 +321,7 @@ export function setupGenerateButton() {
     clearGenerateResult();
 
     try {
-      var result = generateStandardisedSchedule(
-        APP_STATE.property,
-        APP_STATE.unit,
-        APP_STATE.mappingConfig
-      );
+      var result = generateStandardisedSchedule(APP_STATE.property, APP_STATE.unit);
       showGenerateResult(result);
     } catch (err) {
       console.error('Generate failed:', err);
@@ -390,7 +353,6 @@ export function refreshStatus() {
   );
   setStatusLines(unitStatus, getFileStatusLines(APP_STATE.unit, 'record', 'records'));
 
-  APP_STATE.mappingConfigured = isMappingConfigured();
   setStatusLines(mappingStatus, getMappingStatusLines());
 
   // Incomplete matching must NOT disable Generate - only require both files parsed.
@@ -398,11 +360,7 @@ export function refreshStatus() {
   generateBtn.disabled = !canGenerate;
 
   if (canGenerate) {
-    var analysis = analyseMatching(
-      APP_STATE.property,
-      APP_STATE.unit,
-      APP_STATE.mappingConfig
-    );
+    var analysis = analyseMatching(APP_STATE.property, APP_STATE.unit);
     renderMatchingSummaryPanel(analysis);
     generateHint.textContent =
       'Ready to generate. Incomplete matching will not block the schedule - unmatched records are reported separately.';

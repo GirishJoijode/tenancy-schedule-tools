@@ -131,8 +131,8 @@
           <div id="unit-status"><div class="status-lines"><div>No file loaded</div></div></div>
         </div>
         <div class="status-card">
-          <h2>Configuration</h2>
-          <div id="mapping-status"><div class="status-lines"><div>Not configured</div></div></div>
+          <h2>Template</h2>
+          <div id="mapping-status"><div class="status-lines"><div>Fixed template</div></div></div>
         </div>
       </div>
 
@@ -142,7 +142,7 @@
           Generate Standardised Schedule
         </button>
         <p class="generate-hint" id="generate-hint">
-          Configure column mappings from Advanced Settings before generating the schedule.
+          Upload Property Level and Unit / TS Level .xlsx files to enable generation.
         </p>
         <div id="generate-result" class="generate-result hidden" aria-live="polite"></div>
       </div>
@@ -194,8 +194,8 @@
             <div id="ps-property-status"><div class="status-lines"><div>No file loaded</div></div></div>
           </div>
           <div class="status-card">
-            <h2>Configuration</h2>
-            <div id="ps-mapping-status"><div class="status-lines"><div>0 of 14 Property Only fields mapped</div></div></div>
+            <h2>Template</h2>
+            <div id="ps-mapping-status"><div class="status-lines"><div>Fixed template</div></div></div>
           </div>
         </div>
 
@@ -303,213 +303,34 @@
   </div>
 
 
+  <button type="button" id="config-open" class="config-fab" aria-label="Open configuration" title="Open configuration">
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.04 7.04 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.59.24-1.13.55-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.81 8.48a.5.5 0 0 0 .12.64L4.96 10.7c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.13.23.4.32.64.22l2.39-.96c.5.39 1.04.7 1.63.94l.36 2.54c.05.24.25.42.49.42h3.8c.24 0 .44-.18.49-.42l.36-2.54c.59-.24 1.13-.55 1.63-.94l2.39.96c.24.1.51.01.64-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/>
+    </svg>
+  </button>
+  <div id="config-modal" class="config-modal hidden" aria-hidden="true">
+    <div class="config-backdrop" data-config-close="true"></div>
+    <div class="config-dialog" role="dialog" aria-modal="true" aria-labelledby="config-title">
+      <header class="config-modal-head">
+        <div>
+          <h2 id="config-title">Configuration</h2>
+          <p>Template logic, calculations and summary rules</p>
+        </div>
+        <button type="button" id="config-close" class="config-close" aria-label="Close configuration">×</button>
+      </header>
+      <div id="config-root" class="config-root"></div>
+    </div>
+  </div>
+
   <footer class="app-footer">
     <p class="privacy-message">
       Files are processed locally in your browser. No information is uploaded or stored externally.
     </p>
   </footer>
 
-  <button
-    type="button"
-    id="settings-btn"
-    class="settings-cog"
-    title="Advanced Settings"
-    aria-label="Advanced Settings"
-  >
-    <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-      <path
-        fill="currentColor"
-        d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54A.49.49 0 0 0 13.98 2h-3.96a.49.49 0 0 0-.48.41l-.36 2.54c-.58.23-1.12.54-1.62.94l-2.39-.96a.49.49 0 0 0-.59.22L2.66 8.47a.49.49 0 0 0 .12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.13.22.39.3.59.22l2.39-.96c.5.4 1.04.72 1.62.94l.36 2.54c.05.24.25.41.48.41h3.96c.24 0 .44-.17.48-.41l.36-2.54c.58-.23 1.12-.54 1.62-.94l2.39.96c.22.09.46 0 .59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"
-      />
-    </svg>
-  </button>
 </div>
 
 
-<div
-  id="settings-modal"
-  class="modal hidden"
-  role="dialog"
-  aria-modal="true"
-  aria-labelledby="settings-title"
->
-  <div class="modal-backdrop" data-role="close"></div>
-  <div class="modal-panel settings-panel">
-    <div class="modal-header">
-      <div>
-        <h2 id="settings-title">Advanced Settings</h2>
-        <p class="modal-subtitle">
-          Configure how source fields map into each standardised schedule.
-        </p>
-      </div>
-      <button type="button" class="modal-close" data-role="close" aria-label="Close" title="Close"><svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
-    </div>
-
-    <div class="settings-template-bar">
-      <label class="schedule-type-label" for="settings-template-select">Schedule Template</label>
-      <select id="settings-template-select" class="settings-template-select"></select>
-    </div>
-
-    <div class="settings-tabs" role="tablist">
-      <button type="button" class="settings-tab active" data-settings-tab="mapping" role="tab">
-        Column Mapping
-      </button>
-      <button type="button" class="settings-tab" data-settings-tab="matching" role="tab" id="settings-matching-tab">
-        Property Matching
-      </button>
-      <button type="button" class="settings-tab" data-settings-tab="configuration" role="tab">
-        Configuration
-      </button>
-    </div>
-
-    <div class="modal-body settings-body">
-      <div data-role="settings-feedback" class="settings-feedback hidden"></div>
-
-      <section data-settings-panel="mapping" class="settings-panel-section">
-        <div id="tenancy-mapping-block">
-          <div id="mapping-summary" class="mapping-summary"></div>
-          <div class="mapping-toolbar">
-            <label class="filter-label" for="mapping-filter">Filter columns</label>
-            <input
-              id="mapping-filter"
-              type="search"
-              class="mapping-filter"
-              placeholder="Search standardised columns..."
-            />
-          </div>
-          <div class="mapping-table-wrap">
-            <table class="mapping-table">
-              <thead>
-                <tr>
-                  <th>Standardised Column</th>
-                  <th>Property Row Source</th>
-                  <th>Unit / TS Row Source</th>
-                  <th class="col-ignore" title="Excluded from generated schedule">Ignore</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody id="mapping-table-body"></tbody>
-            </table>
-          </div>
-          <p class="settings-note">
-            Upload representative Property and Unit .xlsx files first so source field dropdowns are populated.
-            Unmapped columns stay in the output as blank fields. Tick Ignore to omit a column.
-          </p>
-        </div>
-
-        <div id="ps-mapping-block" class="hidden">
-          <div id="ps-mapping-summary" class="mapping-summary"></div>
-          <div class="mapping-toolbar">
-            <label class="filter-label" for="ps-mapping-filter">Filter columns</label>
-            <input
-              id="ps-mapping-filter"
-              type="search"
-              class="mapping-filter"
-              placeholder="Search standardised columns..."
-            />
-          </div>
-          <div class="mapping-table-wrap">
-            <table class="mapping-table">
-              <thead>
-                <tr>
-                  <th>Standardised Column</th>
-                  <th>Property Level Source</th>
-                  <th class="col-ignore" title="Excluded from generated schedule">Ignore</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody id="ps-mapping-table-body"></tbody>
-            </table>
-          </div>
-          <p class="settings-note">
-            Property Only uses Property Level fields only. Blank mappings stay in the output as empty columns.
-            Tick Ignore to omit a column.
-          </p>
-        </div>
-      </section>
-
-      <section data-settings-panel="matching" class="settings-panel-section hidden">
-        <div class="match-fields">
-          <div class="match-field">
-            <label for="property-match-select">Property Level Match Field</label>
-            <select id="property-match-select" class="source-select"></select>
-          </div>
-          <div class="match-field">
-            <label for="unit-match-select">Unit / TS Match Field</label>
-            <select id="unit-match-select" class="source-select"></select>
-          </div>
-        </div>
-        <p class="settings-note">
-          The selected fields are used to associate Unit / TS records with their parent Property.
-          Matching uses trimmed, case-insensitive values with collapsed whitespace; meaningful punctuation is preserved.
-        </p>
-      </section>
-
-      <section data-settings-panel="configuration" class="settings-panel-section hidden">
-        <dl class="config-meta">
-          <div>
-            <dt>Configuration Version</dt>
-            <dd id="config-version-value">1</dd>
-          </div>
-          <div>
-            <dt>Application Version</dt>
-            <dd id="app-version-value">1.0.0</dd>
-          </div>
-        </dl>
-        <div class="config-actions">
-          <button type="button" id="btn-export-config" class="btn-primary">
-            Export Configuration
-          </button>
-          <button type="button" id="btn-import-config" class="btn-secondary">
-            Import Configuration
-          </button>
-          <button type="button" id="btn-reset-mapping" class="btn-danger">
-            Reset Mapping
-          </button>
-          <input
-            type="file"
-            id="config-import-input"
-            accept="application/json,.json"
-            class="file-input"
-          />
-        </div>
-        <p class="settings-note">
-          <strong>Export Configuration</strong> downloads a JSON file of the current mappings.
-          <strong>Import Configuration</strong> loads a previously exported JSON file after validation.
-          Edits are stored in this browser only (localStorage) and never uploaded.
-          <strong>Reset Mapping</strong> restores the original default mappings that shipped with the application.
-        </p>
-      </section>
-    </div>
-    <div class="settings-footer">
-      <span id="settings-dirty-state" class="settings-dirty-state"></span>
-      <button type="button" id="btn-save-config" class="btn-primary">Save Changes</button>
-    </div>
-  </div>
-</div>
-
-<div
-  id="confirm-modal"
-  class="modal hidden"
-  role="dialog"
-  aria-modal="true"
-  aria-labelledby="confirm-title"
->
-  <div class="modal-backdrop" data-role="confirm-close"></div>
-  <div class="modal-panel confirm-panel">
-    <div class="modal-header">
-      <h2 id="confirm-title">Confirm</h2>
-      <button type="button" class="modal-close" data-role="confirm-close" aria-label="Close" title="Close"><svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true" focusable="false"><path d="M1 1l10 10M11 1L1 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
-    </div>
-    <div class="modal-body">
-      <p id="confirm-message"></p>
-      <div class="confirm-actions">
-        <button type="button" id="confirm-cancel" class="btn-secondary">Cancel</button>
-        <button type="button" id="confirm-ok" class="btn-danger">Reset Mapping</button>
-      </div>
-    </div>
-  </div>
-</div>
-    <script type="module" src="/src/main.js"></script>
+<script type="module" src="/src/main.js"></script>
   </body>
 </html>

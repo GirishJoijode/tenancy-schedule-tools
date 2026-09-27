@@ -1,22 +1,18 @@
-import * as XLSX from 'xlsx-js-style';
-import { GROUP_HEADER_OFFSET, HEADER_MARKERS, HEADER_SEARCH_ROWS } from '../config/constants.js';
+import * as XLSXNamespace from 'xlsx-js-style';
 
-export function normaliseHeader(value) {
-  if (value === null || value === undefined) return '';
-  return String(value)
-    .replace(/\u00a0/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .toLowerCase();
-}
+var XLSX = XLSXNamespace.utils ? XLSXNamespace : XLSXNamespace.default;
+import { GROUP_HEADER_OFFSET, HEADER_SEARCH_ROWS } from '../config/constants.js';
+import { HEADER_MARKERS } from '../schema/sourceFields.js';
+import {
+  buildSourceColumnKey,
+  normaliseHeader,
+  normaliseJoinValue,
+  normaliseMatchingKey,
+} from '../schema/text.js';
+import { periodLabelFromHeader } from '../schema/periods.js';
+import { assertRecognisedSource, omitBlankPropertyNameRows } from '../schema/validateSource.js';
 
-export function normaliseMatchingKey(value) {
-  return normaliseHeader(value);
-}
-
-export function normaliseJoinValue(value) {
-  return normaliseMatchingKey(value);
-}
+export { buildSourceColumnKey, normaliseHeader, normaliseJoinValue, normaliseMatchingKey };
 
 export function columnIndexToLetter(index) {
   var n = index + 1;
@@ -27,16 +23,6 @@ export function columnIndexToLetter(index) {
     n = Math.floor((n - 1) / 26);
   }
   return letter;
-}
-
-export function buildSourceColumnKey(fileType, section, field, occurrence) {
-  var parts = [
-    normaliseMatchingKey(fileType),
-    normaliseMatchingKey(section) || '(no section)',
-    normaliseMatchingKey(field) || '(blank)',
-    String(occurrence),
-  ];
-  return parts.join('|');
 }
 
 export function readWorkbook(arrayBuffer) {
@@ -290,6 +276,8 @@ export function parseSourceFile(file, fileType) {
       }
 
       var fieldHeaders = Array.from({ length: columnCount }, function (_, c) {
+        var periodLabel = periodLabelFromHeader(fieldRow[c]);
+        if (periodLabel) return periodLabel;
         return cellDisplayText(fieldRow[c]).trim();
       });
 
@@ -308,7 +296,13 @@ export function parseSourceFile(file, fileType) {
         throw new Error('No source columns were detected on the header row.');
       }
 
-      var extracted = extractDataRows(matrix, headerRowIndex, columns);
+      assertRecognisedSource(fileType, columns);
+
+      var extracted = omitBlankPropertyNameRows(
+        extractDataRows(matrix, headerRowIndex, columns),
+        columns,
+        fileType
+      );
 
       return {
         fileName: file.name,
@@ -322,9 +316,22 @@ export function parseSourceFile(file, fileType) {
       };
     })
     .catch(function (err) {
-      if (err && typeof err.message === 'string' && err.message) {
+      var message = err && typeof err.message === 'string' ? err.message : '';
+      if (
+        message.indexOf('Source format not recognised') === 0 ||
+        message.indexOf('Could not find header marker') === 0 ||
+        message.indexOf('The file could not be opened') === 0 ||
+        message.indexOf('The worksheet') === 0 ||
+        message.indexOf('The workbook') === 0 ||
+        message.indexOf('No source columns') === 0 ||
+        message.indexOf('Worksheet ') === 0 ||
+        message.indexOf('Header marker') === 0 ||
+        message.indexOf('Unsupported file type') === 0 ||
+        message.indexOf('Could not read the selected file') === 0 ||
+        message.indexOf('Please upload') === 0
+      ) {
         throw err;
       }
-      throw new Error('Could not read the selected file.');
+      throw new Error('The file could not be read as a recognised Property or Unit workbook.');
     });
 }

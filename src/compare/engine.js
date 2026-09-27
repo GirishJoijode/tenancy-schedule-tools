@@ -1,33 +1,19 @@
-import {
-  COMPARE_IDENTITY,
-  COMPARE_NUMERIC_EPS,
-  DATE_COMPARE_IDS,
-  STANDARD_TEMPLATE_COLUMNS,
-} from '../config/constants.js';
-import { findExactSourceColumn } from '../config/mapping.js';
-import { normaliseJoinValue } from '../excel/parser.js';
-import { resolveMappedValue } from '../standardiser/transform.js';
+import { COMPARE_NUMERIC_EPS, DATE_COMPARE_IDS } from '../config/constants.js';
+import { COMPARE_IDENTITY } from '../schema/sourceFields.js';
+import { normaliseJoinValue } from '../schema/text.js';
+import { findSourceColumn, readSourceValue } from '../schema/sourceLookup.js';
+import { DEFAULT_SCHEDULE_COLUMNS } from '../templates/defaultSchedule.js';
 
-export function getUnitMappedCompareColumns(mappingConfig) {
+export function getUnitCompareColumns() {
   var cols = [];
-  if (!mappingConfig || !mappingConfig.columnMappings) return cols;
-  for (var i = 0; i < STANDARD_TEMPLATE_COLUMNS.length; i += 1) {
-    var templateCol = STANDARD_TEMPLATE_COLUMNS[i];
-    var entry = null;
-    for (var j = 0; j < mappingConfig.columnMappings.length; j += 1) {
-      if (mappingConfig.columnMappings[j].targetColumnId === templateCol.id) {
-        entry = mappingConfig.columnMappings[j];
-        break;
-      }
-    }
-    if (entry && entry.ignore === true) continue;
-    if (entry && entry.unitMapping && entry.unitMapping.type === 'source') {
-      cols.push({
-        id: templateCol.id,
-        label: templateCol.label,
-        unitMapping: entry.unitMapping,
-      });
-    }
+  for (var i = 0; i < DEFAULT_SCHEDULE_COLUMNS.length; i += 1) {
+    var column = DEFAULT_SCHEDULE_COLUMNS[i];
+    if (!column.unit) continue;
+    cols.push({
+      id: column.id,
+      label: column.label,
+      unit: column.unit,
+    });
   }
   return cols;
 }
@@ -131,7 +117,7 @@ function buildUnitCompareRecord(parsedRow, parsedWorkbook, compareColumns, prope
   var values = {};
   for (var i = 0; i < compareColumns.length; i += 1) {
     var col = compareColumns[i];
-    values[col.id] = resolveMappedValue(col.unitMapping, parsedRow, parsedWorkbook.columns);
+    values[col.id] = readSourceValue(parsedRow, parsedWorkbook.columns, 'unit', col.unit);
   }
   var propKey = normaliseJoinValue(propertyName);
   var unitKey = normaliseJoinValue(unitName);
@@ -172,36 +158,23 @@ function indexCompareRecords(records) {
   return { map: map, duplicates: duplicates };
 }
 
-export function runTenancyCompare(currentParsed, previousParsed, mappingConfig) {
+function identityColumn(columns, ref) {
+  return findSourceColumn(columns, 'unit', ref);
+}
+
+export function runTenancyCompare(currentParsed, previousParsed) {
   var errors = [];
   var warnings = [];
   if (!currentParsed) errors.push('Current TS workbook is not loaded.');
   if (!previousParsed) errors.push('Previous TS workbook is not loaded.');
-  if (!mappingConfig) errors.push('Mapping configuration is not available.');
   if (errors.length) {
     return { ok: false, errors: errors, warnings: warnings, pairs: [], summary: null, columns: [] };
   }
 
-  var propertyColCurrent = findExactSourceColumn(
-    currentParsed.columns,
-    COMPARE_IDENTITY.property.section,
-    COMPARE_IDENTITY.property.field
-  );
-  var unitColCurrent = findExactSourceColumn(
-    currentParsed.columns,
-    COMPARE_IDENTITY.unit.section,
-    COMPARE_IDENTITY.unit.field
-  );
-  var propertyColPrevious = findExactSourceColumn(
-    previousParsed.columns,
-    COMPARE_IDENTITY.property.section,
-    COMPARE_IDENTITY.property.field
-  );
-  var unitColPrevious = findExactSourceColumn(
-    previousParsed.columns,
-    COMPARE_IDENTITY.unit.section,
-    COMPARE_IDENTITY.unit.field
-  );
+  var propertyColCurrent = identityColumn(currentParsed.columns, COMPARE_IDENTITY.property);
+  var unitColCurrent = identityColumn(currentParsed.columns, COMPARE_IDENTITY.unit);
+  var propertyColPrevious = identityColumn(previousParsed.columns, COMPARE_IDENTITY.property);
+  var unitColPrevious = identityColumn(previousParsed.columns, COMPARE_IDENTITY.unit);
 
   if (!propertyColCurrent) errors.push('Property Name field could not be identified in Current TS.');
   if (!unitColCurrent) errors.push('Suite field could not be identified in Current TS.');
@@ -211,9 +184,9 @@ export function runTenancyCompare(currentParsed, previousParsed, mappingConfig) 
     return { ok: false, errors: errors, warnings: warnings, pairs: [], summary: null, columns: [] };
   }
 
-  var compareColumns = getUnitMappedCompareColumns(mappingConfig);
+  var compareColumns = getUnitCompareColumns();
   if (compareColumns.length === 0) {
-    errors.push('No Unit / TS mappings are configured in Advanced Settings, so there are no fields to compare.');
+    errors.push('No Unit fields are defined for comparison.');
     return { ok: false, errors: errors, warnings: warnings, pairs: [], summary: null, columns: [] };
   }
 

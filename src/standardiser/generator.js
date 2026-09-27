@@ -2,8 +2,8 @@ import { OUTPUT_FILENAME } from '../config/constants.js';
 import { buildWorkbookFromModel, downloadWorkbook } from '../excel/writer.js';
 import { transformToSchedule } from './transform.js';
 
-export function generateStandardisedSchedule(propertyData, unitData, mappingConfig) {
-  var model = transformToSchedule(propertyData, unitData, mappingConfig);
+export function generateStandardisedSchedule(propertyData, unitData) {
+  var model = transformToSchedule(propertyData, unitData);
 
   if (!model.ok) {
     return {
@@ -16,7 +16,7 @@ export function generateStandardisedSchedule(propertyData, unitData, mappingConf
 
   try {
     var workbook = buildWorkbookFromModel(model);
-    downloadWorkbook(workbook, OUTPUT_FILENAME);
+    downloadWorkbook(workbook, OUTPUT_FILENAME, { freezeHeaderRows: 2 });
 
     return {
       ok: true,

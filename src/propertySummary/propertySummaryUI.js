@@ -1,8 +1,7 @@
-import { getPropertySummaryMappingSummary } from '../config/propertySummaryColumns.js';
+import { PROPERTY_ONLY_COLUMNS } from '../templates/propertyOnly.js';
 import { parseSourceFile } from '../excel/parser.js';
-import { APP_STATE, PROPERTY_SUMMARY_STATE } from '../state.js';
+import { PROPERTY_SUMMARY_STATE } from '../state.js';
 import { escapeHtml, formatCount, qs, setStatusLines } from '../ui/common.js';
-import { refreshSettingsIfOpen } from '../settings/settingsUI.js';
 import { generatePropertySummary } from './propertySummary.js';
 
 function getFileStatusLines(parsed) {
@@ -16,34 +15,13 @@ function getFileStatusLines(parsed) {
 }
 
 function getConfigStatusLines() {
-  var config = APP_STATE.mappingConfig && APP_STATE.mappingConfig.propertySummary;
-  var summary = getPropertySummaryMappingSummary(config, PROPERTY_SUMMARY_STATE.property);
-  var lines = [
-    summary.propertyMappings +
-      ' of ' +
-      summary.standardColumns +
-      ' Property Only fields mapped',
+  var sourced = PROPERTY_ONLY_COLUMNS.filter(function (column) {
+    return column.property;
+  }).length;
+  return [
+    'Fixed template',
+    sourced + ' of ' + PROPERTY_ONLY_COLUMNS.length + ' fields sourced',
   ];
-  if (summary.unmappedColumns > 0) {
-    lines.push(
-      summary.unmappedColumns +
-        ' field' +
-        (summary.unmappedColumns === 1 ? '' : 's') +
-        ' unmapped (included as blank columns)'
-    );
-  }
-  if (summary.ignoredColumns > 0) {
-    lines.push(
-      summary.ignoredColumns +
-        ' field' +
-        (summary.ignoredColumns === 1 ? '' : 's') +
-        ' ignored (omitted from output)'
-    );
-  }
-  if (summary.missingMappings > 0) {
-    lines.push('\u26a0 ' + summary.missingMappings + ' mapped field' + (summary.missingMappings === 1 ? '' : 's') + ' missing from the uploaded file');
-  }
-  return lines;
 }
 
 function clearGenerateResult() {
@@ -118,7 +96,7 @@ export function refreshPropertySummaryStatus() {
 
   if (generateHint) {
     generateHint.textContent = canGenerate
-      ? 'Ready to generate. Unmapped fields stay in the workbook as blank columns. Ignored fields are omitted.'
+      ? 'Ready to generate. Fields without a source stay blank.'
       : 'Upload a Property Level .xlsx file to enable generation.';
   }
 }
@@ -170,7 +148,6 @@ function setupPropertySummaryDropzone(dropzone) {
         showSuccess(parsed);
         clearGenerateResult();
         refreshPropertySummaryStatus();
-        refreshSettingsIfOpen();
       })
       .catch(function (err) {
         PROPERTY_SUMMARY_STATE.property = null;
@@ -181,7 +158,6 @@ function setupPropertySummaryDropzone(dropzone) {
         );
         clearGenerateResult();
         refreshPropertySummaryStatus();
-        refreshSettingsIfOpen();
         console.error('[propertySummary] parse failed:', err);
       });
   }
@@ -250,10 +226,7 @@ export function setupPropertySummaryTool() {
       if (btn.disabled) return;
       clearGenerateResult();
       try {
-        var result = generatePropertySummary(
-          PROPERTY_SUMMARY_STATE.property,
-          APP_STATE.mappingConfig && APP_STATE.mappingConfig.propertySummary
-        );
+        var result = generatePropertySummary(PROPERTY_SUMMARY_STATE.property);
         showGenerateResult(result);
       } catch (err) {
         console.error('Property Summary generate failed:', err);
