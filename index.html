@@ -25,6 +25,8 @@
 
   <div id="view-standardiser">
   <div class="schedule-type-bar">
+    <div class="schedule-type-controls">
+    <div class="schedule-type-field">
     <label class="schedule-type-label" id="schedule-type-label" for="schedule-type-trigger">Schedule Type</label>
     <div class="schedule-type-select" id="schedule-type-select">
       <button
@@ -46,13 +48,24 @@
         aria-labelledby="schedule-type-label"
       ></ul>
     </div>
+    </div>
+    <button type="button" class="report-fields-btn" id="report-fields-btn" title="Choose and arrange optional report columns. Required and system fields remain fixed.">
+      <svg class="report-fields-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+        <rect x="1" y="1" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+        <rect x="9" y="1" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+        <rect x="1" y="9" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+        <rect x="9" y="9" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+      </svg>
+      Report Fields
+    </button>
+    </div>
     <p class="schedule-type-blurb" id="schedule-type-blurb">
       Convert Property and Unit level exports into the standard tenancy schedule.
     </p>
   </div>
   <div id="schedule-tenancy">
   <main class="app-main">
-    <section class="upload-grid" aria-label="File uploads">
+    <section class="upload-grid upload-with-previous" aria-label="File uploads">
       <div
         class="dropzone"
         id="property-dropzone"
@@ -61,7 +74,24 @@
         role="button"
         aria-label="Upload Property Level Excel file"
       >
-        <div class="dropzone-label">Property Level File</div>
+        <div class="dropzone-label">
+          <span>Property Level File</span>
+          <button
+            type="button"
+            class="upload-guide-trigger"
+            data-upload-guide="property"
+            aria-label="How to prepare the Property Level file"
+            aria-expanded="false"
+            aria-controls="upload-guide"
+            aria-haspopup="dialog"
+          >
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+              <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.3"></circle>
+              <path d="M8 7.15V11.2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path>
+              <circle cx="8" cy="4.9" r="0.75" fill="currentColor"></circle>
+            </svg>
+          </button>
+        </div>
         <div class="dropzone-idle" data-role="idle">
           <p class="dropzone-prompt">
             Drag and drop Property Level .xlsx file here
@@ -94,7 +124,24 @@
         role="button"
         aria-label="Upload Unit Level Excel file"
       >
-        <div class="dropzone-label">Unit Level File</div>
+        <div class="dropzone-label">
+          <span>Unit Level File</span>
+          <button
+            type="button"
+            class="upload-guide-trigger"
+            data-upload-guide="unit"
+            aria-label="How to prepare the Unit Level file"
+            aria-expanded="false"
+            aria-controls="upload-guide"
+            aria-haspopup="dialog"
+          >
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">
+              <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.3"></circle>
+              <path d="M8 7.15V11.2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path>
+              <circle cx="8" cy="4.9" r="0.75" fill="currentColor"></circle>
+            </svg>
+          </button>
+        </div>
         <div class="dropzone-idle" data-role="idle">
           <p class="dropzone-prompt">
             Drag and drop Unit / TS Level .xlsx file here
@@ -118,6 +165,91 @@
           data-role="input"
         />
       </div>
+
+      <aside class="previous-valuation" aria-label="Previous Valuation">
+        <header class="previous-head">
+          <div class="previous-head-copy">
+            <h2>Previous Valuation</h2>
+            <p>Optional comparison files</p>
+          </div>
+          <button type="button" class="previous-help" aria-label="Optional files used to compare the current schedule with the previous valuation.">
+            <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+              <circle cx="8" cy="8" r="6.25" fill="none" stroke="currentColor" stroke-width="1.3"></circle>
+              <path d="M8 7.2V11.2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path>
+              <circle cx="8" cy="5" r="0.7" fill="currentColor"></circle>
+            </svg>
+            <span class="previous-help-tip" role="tooltip">Optional files used to compare the current schedule with the previous valuation.</span>
+          </button>
+        </header>
+        <p class="previous-date hidden" id="previous-valuation-date"></p>
+        <div class="previous-slots">
+          <div
+            class="dropzone dropzone-compact"
+            id="previous-property-dropzone"
+            data-file-type="property"
+            data-state-key="previousProperty"
+            tabindex="0"
+            role="group"
+            aria-label="Previous Property file"
+          >
+            <div class="previous-slot-label">Property</div>
+            <div class="previous-slot-body">
+              <div class="dropzone-idle" data-role="idle">
+                <p class="dropzone-prompt">No file loaded</p>
+              </div>
+              <div class="dropzone-success hidden" data-role="success">
+                <p class="previous-filename" data-role="filename"></p>
+                <p class="previous-valid" data-role="rows"></p>
+              </div>
+              <div class="dropzone-error hidden" data-role="error"></div>
+            </div>
+            <div class="previous-slot-actions">
+              <button type="button" class="previous-action" data-role="browse">Browse</button>
+              <button type="button" class="previous-action previous-replace" data-role="replace">Replace</button>
+              <button type="button" class="previous-action previous-remove" data-role="remove">Remove</button>
+            </div>
+            <input
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              class="file-input"
+              data-role="input"
+            />
+          </div>
+          <div
+            class="dropzone dropzone-compact"
+            id="previous-unit-dropzone"
+            data-file-type="unit"
+            data-state-key="previousUnit"
+            tabindex="0"
+            role="group"
+            aria-label="Previous Unit / TS file"
+          >
+            <div class="previous-slot-label">Unit / TS</div>
+            <div class="previous-slot-body">
+              <div class="dropzone-idle" data-role="idle">
+                <p class="dropzone-prompt">No file loaded</p>
+              </div>
+              <div class="dropzone-success hidden" data-role="success">
+                <p class="previous-filename" data-role="filename"></p>
+                <p class="previous-valid" data-role="rows"></p>
+              </div>
+              <div class="dropzone-error hidden" data-role="error"></div>
+            </div>
+            <div class="previous-slot-actions">
+              <button type="button" class="previous-action" data-role="browse">Browse</button>
+              <button type="button" class="previous-action previous-replace" data-role="replace">Replace</button>
+              <button type="button" class="previous-action previous-remove" data-role="remove">Remove</button>
+            </div>
+            <input
+              type="file"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              class="file-input"
+              data-role="input"
+            />
+          </div>
+        </div>
+        <p class="previous-status" id="previous-panel-status">Add a previous valuation to enable comparisons.</p>
+      </aside>
     </section>
 
     <section class="status-panel" aria-label="Processing status">
@@ -326,10 +458,26 @@
     <p class="privacy-message">
       Files are processed locally in your browser. No information is uploaded or stored externally.
     </p>
+    <p class="page-signature">Powered by Rish's love for Tequila</p>
   </footer>
 
 </div>
 
+
+<div id="report-fields-modal" class="report-modal hidden" role="dialog" aria-modal="true" aria-labelledby="report-fields-title" aria-describedby="report-fields-subtitle" hidden>
+  <div class="report-backdrop" data-report-dismiss></div>
+  <div class="report-dialog">
+    <header class="report-modal-header">
+      <div>
+        <h2 id="report-fields-title">Report Fields &amp; Order</h2>
+        <p id="report-fields-subtitle">Choose which fields appear in the report and arrange their display order.</p>
+      </div>
+      <button type="button" class="report-close" id="report-fields-close" aria-label="Close report fields">×</button>
+    </header>
+    <div id="report-fields-root" class="report-body"></div>
+    <footer id="report-fields-footer" class="report-footer"></footer>
+  </div>
+</div>
 
 <script type="module" src="/src/main.js"></script>
   </body>

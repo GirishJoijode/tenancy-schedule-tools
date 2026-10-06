@@ -8,10 +8,14 @@ import { setupScheduleTypeSwitcher } from './ui/scheduleTypeSelect.js';
 import { setupDropzone, setupGenerateButton, refreshStatus } from './standardiser/ui.js';
 import { setupAppModeSwitcher } from './ui/appSwitcher.js';
 import { setupConfigurationTool } from './configTool/ui.js';
+import { setupReportFields } from './standardiser/reportFields.js';
+import { setupUploadGuides } from './standardiser/uploadGuide.js';
 
 function init() {
   document.querySelectorAll('#schedule-tenancy .dropzone').forEach(setupDropzone);
   setupScheduleTypeSwitcher();
+  setupReportFields();
+  setupUploadGuides();
   setupPropertySummaryTool();
   setupConfigurationTool();
   setupAppModeSwitcher();

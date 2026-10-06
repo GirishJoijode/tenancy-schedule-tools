@@ -55,7 +55,10 @@ function aggregationToken(ref) {
 export function sourcePath(rule, context) {
   var ref = (rule && rule.ref) || {};
   var dataset = datasetLabel(datasetOf(rule, context));
-  if (ref.type === 'periodGroup') return dataset + ' › ' + (ref.section || 'Period group');
+  if (ref.type === 'periodGroup') {
+    if (ref.section === 'Capital Cost' && ref.aggregation === 'sum') return 'Unit / TS › Capital Cost › All Period Columns';
+    return dataset + ' › ' + (ref.section || 'Period group');
+  }
   if (!ref.section && !ref.field) return 'Source not set';
   return dataset + ' › ' + (ref.section || '') + ' › ' + (ref.field || '');
 }
@@ -82,6 +85,7 @@ export function scopeLine(rule) {
 
 export function methodLabel(rule) {
   if (!rule || rule.method === 'blank' || (rule.method === 'summary' && rule.summary === 'blank')) return 'Blank';
+  if (rule.method === 'aggregatedSource' && rule.sign === 'cost') return 'Aggregated Source / Derived Aggregation';
   return METHOD_LABELS[rule.method] || 'Blank';
 }
 
@@ -93,10 +97,20 @@ export function describeRule(rule, context, columns, columnId) {
   if (rule.method === 'fixed') return 'Fixed value\n' + (rule.value == null ? '' : rule.value);
   if (rule.method === 'source') {
     var source = sourcePath(rule, context);
+    if (columnId === 'cap_ex') return source + '\nUses Capital Costs directly from the Property Level source.';
     if (columnId === 'break_date' && context === 'unit') return source + '\nFormat: dd/mm/yyyy';
     return source;
   }
   if (rule.method === 'aggregatedSource') {
+    if (columnId === 'cap_ex') {
+      return [
+        'Unit / TS › Capital Cost › All Period Columns',
+        'Aggregation: Sum',
+        'Sign Convention: Cost / Outflow',
+        'Output: Negative absolute value',
+        'Sums all Capital Cost period values for the current Unit and reports the result as a negative cost.',
+      ].join('\n');
+    }
     var preview = aggregatedPreview(rule, context);
     if (rule.ref && rule.ref.scope === 'currentUnitRow') {
       return preview + '\nScope: Current Unit Source Row\nUses the maximum occupied area across all available period columns for this Unit only.';
@@ -104,6 +118,10 @@ export function describeRule(rule, context, columns, columnId) {
     return preview;
   }
   if (rule.method === 'summary' && rule.summary === 'sum') {
+    if (columnId === 'cap_ex') {
+      if (context === 'sectorTotal') return 'SUM Property › General › Capital Costs in Sector';
+      if (context === 'grandTotal') return 'SUM Property › General › Capital Costs in Portfolio';
+    }
     if (rule.scope === 'matchedUnits') {
       if (rule.scopeNote === 'sector') return 'SUM Unit Areas in Sector';
       if (rule.scopeNote === 'portfolio') return 'SUM all Unit Areas in Portfolio';
@@ -115,6 +133,9 @@ export function describeRule(rule, context, columns, columnId) {
     if (columnId === 'cv_psf' && context === 'sectorTotal') return 'Sector Fair Value ÷ Sector Area';
     if (columnId === 'cv_psf' && context === 'grandTotal') return 'Grand Fair Value ÷ Grand Area';
     return fieldLabel(columns, rule.numerator && rule.numerator.id) + ' ' + operationSymbol(rule.operation) + ' ' + fieldLabel(columns, rule.denominator && rule.denominator.id);
+  }
+  if (rule.method === 'derived' && rule.calculation === 'assetUnitReference') {
+    return 'Address + "_" + Unit';
   }
   if (rule.method === 'derived' && rule.calculation === 'divide') {
     if (rule.scopeNote === 'sector') return 'Sector Fair Value ÷ Sector Area';

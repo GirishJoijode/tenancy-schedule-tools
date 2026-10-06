@@ -18,11 +18,20 @@ var MONTH_NAMES = [
 export var MULTIPLE_VALUATION_DATES_WARNING =
   'Multiple valuation dates detected. Fair Value heading cannot be resolved to a single portfolio date.';
 
-export function formatFairValueHeading(value) {
+export function formatValuationPeriod(value) {
   var date = asDate(value);
-  if (!date) return 'Fair Value';
-  return 'Fair Value ' + MONTH_NAMES[date.getMonth()] + ' ' + date.getFullYear();
+  if (!date) return '';
+  return MONTH_NAMES[date.getMonth()] + ' ' + date.getFullYear();
 }
+
+export function formatFairValueHeading(value) {
+  var period = formatValuationPeriod(value);
+  if (!period) return 'Fair Value';
+  return 'Fair Value ' + period;
+}
+
+export var MULTIPLE_PREVIOUS_VALUATION_DATES_WARNING =
+  'Multiple previous valuation dates detected. Previous comparison headings use Previous Valuation.';
 
 export function resolvePortfolioValuation(dates) {
   var unique = [];
@@ -36,14 +45,15 @@ export function resolvePortfolioValuation(dates) {
     resolved.push(date);
   }
   if (resolved.length === 0) {
-    return { date: null, consistent: true, heading: 'Fair Value' };
+    return { date: null, consistent: true, heading: 'Fair Value', period: '' };
   }
   if (resolved.length > 1) {
-    return { date: null, consistent: false, heading: 'Fair Value' };
+    return { date: null, consistent: false, heading: 'Fair Value', period: '' };
   }
   return {
     date: resolved[0],
     consistent: true,
     heading: formatFairValueHeading(resolved[0]),
+    period: formatValuationPeriod(resolved[0]),
   };
 }

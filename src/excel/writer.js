@@ -3,6 +3,7 @@ import * as XLSXNamespace from 'xlsx-js-style';
 var XLSX = XLSXNamespace.utils ? XLSXNamespace : XLSXNamespace.default;
 import { DATE_COMPARE_IDS } from '../config/constants.js';
 import { DEFAULT_SCHEDULE_COLUMNS } from '../templates/defaultSchedule.js';
+import { changeTone, comparisonTone, fairValueChangeTone, roundedChangePercentagePoints } from '../logic/comparison.js';
 
 const HEADER_FILL = { patternType: 'solid', fgColor: { rgb: '002060' } };
 const HEADER_FONT = { bold: true, color: { rgb: 'FFFFFF' }, name: 'Calibri', sz: 11 };
@@ -79,7 +80,14 @@ const LEFT_COLUMN_IDS = new Set([
   'tenant_name',
 ]);
 
+function comparisonBaseId(columnId) {
+  var marker = String(columnId || '').indexOf('__');
+  return marker === -1 ? columnId : String(columnId).slice(0, marker);
+}
+
 export function getNumberFormat(columnId, value) {
+  if (String(columnId).slice(-8) === '__change') return '0.00%';
+  if (String(columnId).indexOf('__previous') !== -1) columnId = comparisonBaseId(columnId);
   if (columnId === 'break_date') {
     if (typeof value === 'number' && Number.isFinite(value)) return '0.00';
     if (value instanceof Date && !Number.isNaN(value.getTime())) return 'dd/mm/yyyy';
@@ -151,9 +159,63 @@ export function valueToCell(value, baseStyle, columnId) {
   };
 }
 
+function reportedCellValue(column, value) {
+  if (!column || column.comparisonRole !== 'change' || column.parentId !== 'fair_value') return value;
+  if (roundedChangePercentagePoints(value) === 0) return 0;
+  return value;
+}
+
 function scheduleHorizontalAlign(columnId) {
-  if (LEFT_COLUMN_IDS.has(columnId)) return 'left';
+  if (LEFT_COLUMN_IDS.has(comparisonBaseId(columnId))) return 'left';
   return 'center';
+}
+
+var COMPARISON_INCREASE = '00B050';
+var COMPARISON_DECREASE = 'FF0000';
+var UNIT_CHANGE_FILL = { patternType: 'solid', fgColor: { rgb: 'FFFFCC' } };
+
+function previousValuePresent(value) {
+  return !(value === null || value === undefined || value === '');
+}
+
+function comparisonValuesDiffer(current, previous) {
+  if (!previousValuePresent(previous)) return false;
+  if (current instanceof Date && previous instanceof Date) return current.getTime() !== previous.getTime();
+  if (typeof current === 'number' && typeof previous === 'number') return current !== previous;
+  return String(current == null ? '' : current) !== String(previous);
+}
+
+function comparisonStyle(style, column, values, rowKind) {
+  if (!column || !column.comparisonRole || !values) return style;
+  var tone = '';
+  var unitChanged = false;
+  if (column.comparisonRole === 'current') {
+    var current = values[column.parentId];
+    var previous = values[column.parentId + '__previous'];
+    var differs = comparisonValuesDiffer(current, previous);
+    if (column.directionHighlight && differs && typeof current === 'number' && typeof previous === 'number') {
+      tone = current === previous ? '' : (current > previous ? 'up' : 'down');
+    } else if (column.directionHighlight) {
+      tone = comparisonTone(current, previous);
+    }
+    unitChanged = rowKind === 'unit' && differs;
+  } else if (column.comparisonRole === 'change') {
+    tone = column.parentId === 'fair_value'
+      ? fairValueChangeTone(values[column.id])
+      : changeTone(values[column.id]);
+  }
+  if (!tone && !unitChanged) return style;
+  var next = Object.assign({}, style);
+  if (tone) {
+    next.font = Object.assign({}, style.font || {}, {
+      color: { rgb: tone === 'up' ? COMPARISON_INCREASE : COMPARISON_DECREASE },
+    });
+  }
+  if (unitChanged) {
+    next.font = Object.assign({}, next.font || style.font || {}, { bold: false });
+    next.fill = UNIT_CHANGE_FILL;
+  }
+  return next;
 }
 
 export function buildDataCellStyle(columnId, isProperty) {
@@ -183,21 +245,21 @@ var SCHEDULE_HEADER_BORDER = {
 
 var SCHEDULE_SECTOR_EDGE = { style: 'medium', color: SCHEDULE_BLACK };
 
-function sectorBandBorder(columnIndex, columnCount) {
+function sectorBandBorder(columnIndex, firstVisible, lastIndex) {
   var border = {
     top: SCHEDULE_SECTOR_EDGE,
     bottom: SCHEDULE_SECTOR_EDGE,
   };
-  if (columnIndex === 0) border.left = SCHEDULE_SECTOR_EDGE;
-  if (columnIndex === columnCount - 1) border.right = SCHEDULE_SECTOR_EDGE;
+  if (columnIndex === firstVisible) border.left = SCHEDULE_SECTOR_EDGE;
+  if (columnIndex === lastIndex) border.right = SCHEDULE_SECTOR_EDGE;
   return border;
 }
 
-function summaryBandStyle(columnIndex, columnCount, horizontal, indent) {
+function summaryBandStyle(columnIndex, firstVisible, lastIndex, horizontal, indent) {
   return {
     fill: HEADER_FILL,
     font: SCHEDULE_HEADER_FONT,
-    border: sectorBandBorder(columnIndex, columnCount),
+    border: sectorBandBorder(columnIndex, firstVisible, lastIndex),
     alignment: {
       vertical: 'center',
       horizontal: horizontal,
@@ -225,12 +287,19 @@ var SCHEDULE_PROPERTY_FILL = { patternType: 'solid', fgColor: { rgb: 'F2F0ED' } 
 var SCHEDULE_WHITE_FILL = { patternType: 'solid', fgColor: { rgb: 'FFFFFF' } };
 var SCHEDULE_HEADER_HEIGHT = 40;
 var SCHEDULE_SEPARATOR_HEIGHT = 8;
-var SCHEDULE_SECTOR_HEIGHT = 18;
 var SCHEDULE_DATA_HEIGHT = 24;
 
 export function buildTenancyScheduleSheet(model) {
   var columns = model.columns;
   var colCount = columns.length;
+  var firstVisible = 0;
+  for (var visibleIndex = 0; visibleIndex < colCount; visibleIndex += 1) {
+    if (!columns[visibleIndex].hiddenInExcel) {
+      firstVisible = visibleIndex;
+      break;
+    }
+  }
+  var lastIndex = Math.max(colCount - 1, 0);
   var scheduleRows = model.scheduleRows || [];
   var rowCount = 2 + scheduleRows.length;
   var ws = {};
@@ -287,15 +356,19 @@ export function buildTenancyScheduleSheet(model) {
 
     if (row.kind === 'sector') {
       merges.push({
-        s: { r: excelRow, c: 0 },
-        e: { r: excelRow, c: Math.max(colCount - 1, 0) },
+        s: { r: excelRow, c: firstVisible },
+        e: { r: excelRow, c: lastIndex },
       });
       for (var sc = 0; sc < colCount; sc += 1) {
         var sectorAddr = XLSX.utils.encode_cell({ r: excelRow, c: sc });
+        if (sc < firstVisible) {
+          ws[sectorAddr] = { t: 's', v: '', s: { font: SCHEDULE_HEADER_FONT } };
+          continue;
+        }
         ws[sectorAddr] = {
           t: 's',
-          v: sc === 0 ? row.sector : '',
-          s: summaryBandStyle(sc, colCount, 'left', sc === 0 ? 1 : 0),
+          v: sc === firstVisible ? row.sector : '',
+          s: summaryBandStyle(sc, firstVisible, lastIndex, 'left', sc === firstVisible ? 1 : 0),
         };
       }
       continue;
@@ -319,8 +392,17 @@ export function buildTenancyScheduleSheet(model) {
       for (var tc = 0; tc < colCount; tc += 1) {
         var totalId = columns[tc].id;
         var totalValue = row.values[totalId];
-        var totalStyle = summaryBandStyle(tc, colCount, scheduleHorizontalAlign(totalId), 0);
-        ws[XLSX.utils.encode_cell({ r: excelRow, c: tc })] = valueToCell(totalValue, totalStyle, totalId);
+        if (tc < firstVisible) {
+          ws[XLSX.utils.encode_cell({ r: excelRow, c: tc })] = { t: 's', v: '', s: { font: SCHEDULE_HEADER_FONT } };
+          continue;
+        }
+        var totalStyle = comparisonStyle(
+          summaryBandStyle(tc, firstVisible, lastIndex, scheduleHorizontalAlign(totalId), 0),
+          columns[tc],
+          row.values,
+          row.kind
+        );
+        ws[XLSX.utils.encode_cell({ r: excelRow, c: tc })] = valueToCell(reportedCellValue(columns[tc], totalValue), totalStyle, totalId);
       }
       continue;
     }
@@ -329,8 +411,8 @@ export function buildTenancyScheduleSheet(model) {
     for (var dc = 0; dc < colCount; dc += 1) {
       var colId = columns[dc].id;
       var dataAddr = XLSX.utils.encode_cell({ r: excelRow, c: dc });
-      var cellStyle = buildDataCellStyle(colId, isProperty);
-      ws[dataAddr] = valueToCell(row.values[colId], cellStyle, colId);
+      var cellStyle = comparisonStyle(buildDataCellStyle(colId, isProperty), columns[dc], row.values, row.kind);
+      ws[dataAddr] = valueToCell(reportedCellValue(columns[dc], row.values[colId]), cellStyle, colId);
     }
   }
 
@@ -344,28 +426,34 @@ export function buildTenancyScheduleSheet(model) {
   ws['!freeze'] = {
     xSplit: 0,
     ySplit: 2,
-    topLeftCell: 'A3',
+    topLeftCell: XLSX.utils.encode_cell({ r: 2, c: firstVisible }),
     activePane: 'bottomLeft',
     state: 'frozen',
   };
-  ws['!views'] = [{ state: 'frozen', ySplit: 2, topLeftCell: 'A3', activeCell: 'A3' }];
+  var freezeAnchor = XLSX.utils.encode_cell({ r: 2, c: firstVisible });
+  ws['!views'] = [{ state: 'frozen', ySplit: 2, topLeftCell: freezeAnchor, activeCell: freezeAnchor }];
+  ws['!freezeAnchor'] = XLSX.utils.encode_col(firstVisible);
 
-  if (colCount > 0 && rowCount > 2) {
+  if (colCount > firstVisible && rowCount > 2) {
     ws['!autofilter'] = {
       ref: XLSX.utils.encode_range({
-        s: { r: 0, c: 0 },
-        e: { r: rowCount - 1, c: colCount - 1 },
+        s: { r: 0, c: firstVisible },
+        e: { r: rowCount - 1, c: lastIndex },
       }),
     };
   }
 
   ws['!cols'] = columns.map(function (col) {
-    return {
-      wch:
-        COLUMN_WIDTHS[col.id] != null
-          ? COLUMN_WIDTHS[col.id]
-          : col.width || Math.min(22, Math.max(10, String(col.label).length + 2)),
-    };
+    var widthKey = col.parentId || col.id;
+    var width =
+      COLUMN_WIDTHS[widthKey] != null
+        ? COLUMN_WIDTHS[widthKey]
+        : col.width != null
+          ? col.width
+          : Math.min(22, Math.max(10, String(col.label).length + 2));
+    var spec = { wch: width };
+    if (col.hiddenInExcel) spec.hidden = true;
+    return spec;
   });
 
   var rowProps = [
@@ -374,14 +462,7 @@ export function buildTenancyScheduleSheet(model) {
   ];
   for (var ri = 0; ri < scheduleRows.length; ri += 1) {
     rowProps.push({
-      hpt:
-        scheduleRows[ri].kind === 'sector' ||
-        scheduleRows[ri].kind === 'sectorTotal' ||
-        scheduleRows[ri].kind === 'grandTotal'
-          ? SCHEDULE_SECTOR_HEIGHT
-          : scheduleRows[ri].kind === 'separator'
-            ? SCHEDULE_SEPARATOR_HEIGHT
-            : SCHEDULE_DATA_HEIGHT,
+      hpt: scheduleRows[ri].kind === 'separator' ? SCHEDULE_SEPARATOR_HEIGHT : SCHEDULE_DATA_HEIGHT,
       customHeight: true,
     });
   }
@@ -535,13 +616,13 @@ function findStoredZipEntry(bytes, targetName) {
   return null;
 }
 
-function injectFrozenHeader(arrayBuffer, ySplit) {
+function injectFrozenHeader(arrayBuffer, ySplit, anchorColumn) {
   var bytes = arrayBuffer instanceof Uint8Array ? arrayBuffer : new Uint8Array(arrayBuffer);
   var entry = findStoredZipEntry(bytes, 'xl/worksheets/sheet1.xml');
   if (!entry || entry.method !== 0) return bytes;
 
   var marker = new TextEncoder().encode('<sheetViews><sheetView workbookViewId="0"/></sheetViews>');
-  var topLeft = 'A' + (ySplit + 1);
+  var topLeft = (anchorColumn || 'A') + (ySplit + 1);
   var replacement = new TextEncoder().encode(
     '<sheetViews><sheetView showGridLines="0" workbookViewId="0"><pane ySplit="' +
       ySplit +
@@ -610,7 +691,10 @@ export function workbookToArrayBuffer(workbook, options) {
     cellDates: true,
   });
   if (options && options.freezeHeaderRows) {
-    return injectFrozenHeader(buffer, options.freezeHeaderRows);
+    var anchor = options.freezeAnchor || 'A';
+    var schedule = workbook.Sheets && workbook.Sheets['Tenancy Schedule'];
+    if (schedule && schedule['!freezeAnchor']) anchor = schedule['!freezeAnchor'];
+    return injectFrozenHeader(buffer, options.freezeHeaderRows, anchor);
   }
   return buffer;
 }

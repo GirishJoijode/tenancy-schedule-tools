@@ -1,4 +1,7 @@
 import { parseSourceFile } from '../excel/parser.js';
+import { resolvePortfolioValuation } from '../logic/fairValue.js';
+import { readSourceValue } from '../schema/sourceLookup.js';
+import { PROPERTY_SOURCE_FIELDS } from '../schema/sourceFields.js';
 import { APP_STATE } from '../state.js';
 import { escapeHtml, formatCount, qs, setStatusLines } from '../ui/common.js';
 import { generateStandardisedSchedule } from './generator.js';
@@ -20,6 +23,7 @@ function getMappingStatusLines() {
 
 export function setupDropzone(dropzone) {
   var fileType = dropzone.dataset.fileType;
+  var stateKey = dropzone.dataset.stateKey || fileType;
   var input = qs(dropzone, '[data-role="input"]');
   var browseBtn = qs(dropzone, '[data-role="browse"]');
   var idle = qs(dropzone, '[data-role="idle"]');
@@ -36,11 +40,19 @@ export function setupDropzone(dropzone) {
     dropzone.classList.remove('has-file', 'has-error');
   }
 
+  var compact = dropzone.classList.contains('dropzone-compact');
+
   function showError(message) {
     idle.classList.add('hidden');
     success.classList.add('hidden');
     errorEl.classList.remove('hidden');
-    errorEl.textContent = message;
+    if (compact) {
+      errorEl.innerHTML =
+        '<span class="previous-error-title">Source format not recognised</span>' +
+        '<span class="previous-error-detail">' + escapeHtml(message) + '</span>';
+    } else {
+      errorEl.textContent = message;
+    }
     dropzone.classList.remove('has-file');
     dropzone.classList.add('has-error');
   }
@@ -49,11 +61,20 @@ export function setupDropzone(dropzone) {
     idle.classList.add('hidden');
     errorEl.classList.add('hidden');
     success.classList.remove('hidden');
-    filenameEl.textContent = '\u2713 ' + parsed.fileName;
-    columnsEl.textContent =
-      '\u2713 ' + formatCount(parsed.columns.length) + ' source columns detected';
-    rowsEl.textContent =
-      '\u2713 ' + formatCount(parsed.dataRowCount) + ' data rows detected';
+    if (compact) {
+      filenameEl.textContent = parsed.fileName;
+      if (rowsEl) rowsEl.textContent = '\u2713 Valid';
+    } else {
+      filenameEl.textContent = '\u2713 ' + parsed.fileName;
+      if (columnsEl) {
+        columnsEl.textContent =
+          '\u2713 ' + formatCount(parsed.columns.length) + ' source columns detected';
+      }
+      if (rowsEl) {
+        rowsEl.textContent =
+          '\u2713 ' + formatCount(parsed.dataRowCount) + ' data rows detected';
+      }
+    }
     dropzone.classList.add('has-file');
     dropzone.classList.remove('has-error');
   }
@@ -63,14 +84,14 @@ export function setupDropzone(dropzone) {
 
     parseSourceFile(file, fileType)
       .then(function (parsed) {
-        APP_STATE[fileType] = parsed;
+        APP_STATE[stateKey] = parsed;
 
         showSuccess(parsed);
         clearGenerateResult();
         refreshStatus();
       })
       .catch(function (err) {
-        APP_STATE[fileType] = null;
+        APP_STATE[stateKey] = null;
         var message =
           err && typeof err.message === 'string' && err.message
             ? err.message
@@ -95,6 +116,25 @@ export function setupDropzone(dropzone) {
     }
   }
 
+  var removeBtn = qs(dropzone, '[data-role="remove"]');
+  var replaceBtn = qs(dropzone, '[data-role="replace"]');
+  if (removeBtn) {
+    removeBtn.addEventListener('click', function (event) {
+      event.stopPropagation();
+      APP_STATE[stateKey] = null;
+      if (input) input.value = '';
+      showIdle();
+      clearGenerateResult();
+      refreshStatus();
+    });
+  }
+  if (replaceBtn) {
+    replaceBtn.addEventListener('click', function (event) {
+      event.stopPropagation();
+      openPicker(event);
+    });
+  }
+
   if (browseBtn) {
     browseBtn.addEventListener('click', function (event) {
       event.stopPropagation();
@@ -103,15 +143,20 @@ export function setupDropzone(dropzone) {
   }
 
   dropzone.addEventListener('click', function (event) {
+    if (event.target.closest && event.target.closest('[data-upload-guide]')) return;
     if (browseBtn && (event.target === browseBtn || browseBtn.contains(event.target))) return;
+    if (removeBtn && (event.target === removeBtn || removeBtn.contains(event.target))) return;
+    if (replaceBtn && (event.target === replaceBtn || replaceBtn.contains(event.target))) return;
     if (event.target && event.target.tagName === 'INPUT') return;
     openPicker(event);
   });
 
   dropzone.addEventListener('keydown', function (event) {
-    if (event.key === 'Enter' || event.key === ' ') {
-      openPicker(event);
-    }
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    if (event.target.closest && event.target.closest('[data-upload-guide]')) return;
+    if (compact && event.target !== dropzone) return;
+    if (compact && event.key === ' ') event.preventDefault();
+    openPicker(event);
   });
 
   input.addEventListener('change', function () {
@@ -321,7 +366,12 @@ export function setupGenerateButton() {
     clearGenerateResult();
 
     try {
-      var result = generateStandardisedSchedule(APP_STATE.property, APP_STATE.unit);
+      var result = generateStandardisedSchedule(
+        APP_STATE.property,
+        APP_STATE.unit,
+        APP_STATE.previousProperty,
+        APP_STATE.previousUnit
+      );
       showGenerateResult(result);
     } catch (err) {
       console.error('Generate failed:', err);
@@ -369,4 +419,36 @@ export function refreshStatus() {
     generateHint.textContent =
       'Upload Property Level and Unit / TS Level .xlsx files to enable generation.';
   }
+
+  updatePreviousPanel();
+}
+
+function updatePreviousPanel() {
+  var note = document.getElementById('previous-panel-status');
+  var dateEl = document.getElementById('previous-valuation-date');
+  if (!note && !dateEl) return;
+  var hasProperty = !!APP_STATE.previousProperty;
+  var hasUnit = !!APP_STATE.previousUnit;
+  if (note) {
+    if (!hasProperty && !hasUnit) {
+      note.textContent = 'Add a previous valuation to enable comparisons.';
+    } else if (hasProperty && !hasUnit) {
+      note.textContent = 'Property comparison available. Unit comparison unavailable.';
+    } else if (!hasProperty && hasUnit) {
+      note.textContent = 'Unit comparison unavailable until the previous Property file is loaded.';
+    } else {
+      note.textContent = 'Property comparison available. Unit comparison available.';
+    }
+  }
+  if (!dateEl) return;
+  var period = '';
+  if (hasProperty) {
+    var data = APP_STATE.previousProperty;
+    var resolved = resolvePortfolioValuation((data.rows || []).map(function (row) {
+      return readSourceValue(row, data.columns, 'property', PROPERTY_SOURCE_FIELDS.traditionalValuationDate);
+    }));
+    if (resolved.consistent && resolved.period) period = resolved.period;
+  }
+  dateEl.textContent = period ? 'Previous valuation: ' + period : '';
+  dateEl.classList.toggle('hidden', !period);
 }

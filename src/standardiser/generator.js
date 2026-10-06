@@ -2,8 +2,11 @@ import { OUTPUT_FILENAME } from '../config/constants.js';
 import { buildWorkbookFromModel, downloadWorkbook } from '../excel/writer.js';
 import { transformToSchedule } from './transform.js';
 
-export function generateStandardisedSchedule(propertyData, unitData) {
-  var model = transformToSchedule(propertyData, unitData);
+export function generateStandardisedSchedule(propertyData, unitData, previousProperty, previousUnit) {
+  var model = transformToSchedule(propertyData, unitData, {
+    previousProperty: previousProperty,
+    previousUnit: previousUnit,
+  });
 
   if (!model.ok) {
     return {

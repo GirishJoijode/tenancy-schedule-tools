@@ -26,6 +26,7 @@ function checkRef(issues, column, context, rule) {
 }
 
 function checkDerived(issues, column, context, rule) {
+  if (rule.calculation === 'assetUnitReference') return;
   if (rule.calculation === 'divide') {
     if (!rule.numerator || !rule.numerator.id) push(issues, column, context, 'Derived calculation is missing a numerator.');
     if (!rule.denominator || !rule.denominator.id) push(issues, column, context, 'Derived calculation is missing a denominator.');

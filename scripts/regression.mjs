@@ -91,6 +91,7 @@ try {
   ]);
   const unitRefs = [UNIT_SOURCE_FIELDS.leaseId].concat(getRequiredUnitFields(), [
     { section: 'Occupied Area (SF)', field: 'Aug-2027' },
+    { section: 'Capital Cost', field: 'Aug-2027' },
   ]);
   const valuationDate = new Date(2026, 8, 30);
 
@@ -178,38 +179,49 @@ try {
 
   const book = buildWorkbookFromModel(model);
   const sheet = book.Sheets['Tenancy Schedule'];
-  assert(sheet.A1.v === 'Property Reference' && sheet.B1.v === 'Valuation', 'header order');
-  assert(sheet.E1.v === 'Tenure (UXT)', 'tenure heading');
-  assert(sheet.M1.v === 'WAULT (Years)', 'WAULT heading');
+  assert(sheet.A1.v === 'Asset Unit Reference' && sheet.B1.v === 'Tenant Reference', 'hidden system headers');
+  assert(sheet['!cols'][0].hidden === true && sheet['!cols'][1].hidden === true, 'system columns are hidden');
+  assert(sheet.C1.v === 'Property Reference' && sheet.D1.v === 'Valuation' && sheet.E1.v === 'Town' && sheet.F1.v === 'Address', 'required visible order');
+  assert(sheet.G1.v === 'Tenure (UXT)', 'tenure heading');
+  assert(sheet.O1.v === 'WAULT (Years)', 'WAULT heading');
   assert(model.columns.some(function (column) { return column.id === 'fair_value' && column.label === 'Fair Value September 2026'; }), 'dynamic fair value heading');
   assert(!model.columns.some(function (column) { return column.id === 'fair_value_march_2026' || column.id === 'pct_change_26_april_24' || column.id === 'pct_change_x_ytd'; }), 'comparison columns hidden');
   assert(sheet.A2.v === '', 'blank separator missing');
-  assert(sheet.A3.v === 'Healthcare' && sheet['!merges'] && sheet['!merges'].length === 4, 'sector headers');
-  assert(sheet.B4.t === 'd' && sheet.B4.z === 'mmm-yy', 'valuation is not a real mmm-yy date');
-  assert(sheet.A4.s.fill.fgColor.rgb === 'F2F0ED' && sheet.A4.s.font.bold === true, 'property row style');
-  assert(!sheet.A5.s.font.bold, 'unit row style');
+  assert(sheet.C3.v === 'Healthcare' && sheet['!merges'] && sheet['!merges'].length === 4 && sheet['!merges'][0].s.c === 2, 'sector headers start at the first visible column');
+  assert(sheet.D4.t === 'd' && sheet.D4.z === 'mmm-yy', 'valuation is not a real mmm-yy date');
+  assert(sheet.C4.s.fill.fgColor.rgb === 'F2F0ED' && sheet.C4.s.font.bold === true, 'property row style');
+  assert(!sheet.C5.s.font.bold, 'unit row style');
   assert(sheet.A1.s.fill.fgColor.rgb === '002060' && sheet.A1.s.font.color.rgb === 'FFFFFF', 'header style');
   assert(sheet.A1.s.font.name === 'Arial' && sheet.A1.s.font.sz === 8, 'header font');
-  assert(sheet.A3.s.font.name === 'Arial' && sheet.A3.s.font.sz === 8 && sheet.A3.s.font.bold === true, 'sector font');
-  assert(sheet.A4.s.font.name === 'Arial' && sheet.A4.s.font.sz === 8, 'property font');
-  assert(sheet.A5.s.font.name === 'Arial' && sheet.A5.s.font.sz === 8, 'unit font');
+  assert(sheet.C3.s.font.name === 'Arial' && sheet.C3.s.font.sz === 8 && sheet.C3.s.font.bold === true, 'sector font');
+  assert(sheet.C4.s.font.name === 'Arial' && sheet.C4.s.font.sz === 8, 'property font');
+  assert(sheet.C5.s.font.name === 'Arial' && sheet.C5.s.font.sz === 8, 'unit font');
   assert(sheet['!rows'][0].hpt === 40 && sheet['!rows'][1].hpt === 8, 'header or separator height');
-  assert(sheet['!rows'][2].hpt === 18 && sheet['!rows'][3].hpt === 24 && sheet['!rows'][4].hpt === 24, 'sector property unit heights');
-  assert(sheet.A1.s.border.bottom.style === 'medium' && sheet.A4.s.border.top.style === 'medium', 'header and property borders');
-  assert(sheet.A5.s.border.top.style === 'thin' && sheet.A5.s.alignment.horizontal === 'left', 'unit border or alignment');
-  assert(sheet.A4.s.alignment.horizontal === 'left' && sheet.D4.s.alignment.horizontal === 'left', 'property reference and address left');
-  assert(sheet.H5.s.alignment.horizontal === 'left', 'tenant name left');
-  assert(sheet.B4.s.alignment.horizontal === 'center' && sheet.F4.s.alignment.horizontal === 'center', 'valuation and area centred');
-  assert(sheet.C4.s.alignment.horizontal === 'center' && sheet.E5.s.alignment.horizontal === 'center', 'town and tenure centred');
-  assert(sheet.A10.v === 'Healthcare TOTAL' && sheet.A10.s.fill.fgColor.rgb === '002060' && sheet.A10.s.font.color.rgb === 'FFFFFF', 'sector total style');
-  assert(sheet.A3.s.fill.fgColor.rgb === sheet.A10.s.fill.fgColor.rgb, 'sector total fill matches sector start');
-  assert(sheet.A3.s.font.name === 'Arial' && sheet.A10.s.font.name === sheet.A3.s.font.name && sheet.A10.s.font.sz === 8 && sheet.A10.s.font.bold === true, 'sector total font matches sector start');
-  assert(sheet.A10.s.alignment.horizontal === 'left' && sheet.F10.s.alignment.horizontal === 'center', 'sector total label left and values centred');
-  assert(sheet.A10.s.border.left && sheet.A10.s.border.left.style === 'medium' && !sheet.A10.s.border.right, 'sector total outer left only');
-  assert(!sheet.B10.s.border.left && !sheet.B10.s.border.right, 'sector total has no internal vertical borders');
-  assert(sheet.A3.s.border.top.style === 'medium' && sheet.A10.s.border.top.style === 'medium' && sheet.A10.s.border.bottom.style === 'medium', 'sector band keeps the outer horizontal edge');
+  assert(sheet['!rows'][2].hpt === 24 && sheet['!rows'][3].hpt === 24 && sheet['!rows'][4].hpt === 24, 'sector property unit heights');
+  assert(sheet.C1.s.border.bottom.style === 'medium' && sheet.C4.s.border.top.style === 'medium', 'header and property borders');
+  assert(sheet.C5.s.border.top.style === 'thin' && sheet.C5.s.alignment.horizontal === 'left', 'unit border or alignment');
+  assert(sheet.C4.s.alignment.horizontal === 'left' && sheet.F4.s.alignment.horizontal === 'left', 'property reference and address left');
+  assert(sheet.J5.s.alignment.horizontal === 'left', 'tenant name left');
+  assert(sheet.D4.s.alignment.horizontal === 'center' && sheet.H4.s.alignment.horizontal === 'center', 'valuation and area centred');
+  assert(sheet.E4.s.alignment.horizontal === 'center' && sheet.G5.s.alignment.horizontal === 'center', 'town and tenure centred');
+  assert(sheet.C10.v === 'Healthcare TOTAL' && sheet.C10.s.fill.fgColor.rgb === '002060' && sheet.C10.s.font.color.rgb === 'FFFFFF', 'sector total style');
+  assert(sheet.C3.s.fill.fgColor.rgb === sheet.C10.s.fill.fgColor.rgb, 'sector total fill matches sector start');
+  assert(sheet.C3.s.font.name === 'Arial' && sheet.C10.s.font.name === sheet.C3.s.font.name && sheet.C10.s.font.sz === 8 && sheet.C10.s.font.bold === true, 'sector total font matches sector start');
+  assert(sheet.C10.s.alignment.horizontal === 'left' && sheet.H10.s.alignment.horizontal === 'center', 'sector total label left and values centred');
+  assert(sheet.C10.s.border.left && sheet.C10.s.border.left.style === 'medium' && !sheet.C10.s.border.right, 'sector total outer left only');
+  assert(!sheet.D10.s.border.left && !sheet.D10.s.border.right, 'sector total has no internal vertical borders');
+  assert(sheet.C3.s.border.top.style === 'medium' && sheet.C10.s.border.top.style === 'medium' && sheet.C10.s.border.bottom.style === 'medium', 'sector band keeps the outer horizontal edge');
+  assert(sheet['!autofilter'].ref.indexOf('C1:') === 0, 'autofilter starts at Property Reference');
   assert(!sheet['!merges'].some(function (merge) { return merge.s.r === 9; }), 'sector total must stay unmerged');
-  assert(sheet['!rows'][9].hpt === 18 && sheet['!rows'][10].hpt === 8, 'total and separator heights');
+  assert(sheet['!rows'][9].hpt === 24 && sheet['!rows'][10].hpt === 8, 'total and separator heights');
+  model.scheduleRows.forEach(function (row, index) {
+    const height = sheet['!rows'][index + 2].hpt;
+    if (row.kind === 'separator') {
+      assert(height === 8, 'separator row height ' + height);
+      return;
+    }
+    assert(height === 24, row.kind + ' row height ' + height);
+  });
   assert(sheet['!freeze'].ySplit === 2 && sheet['!autofilter'], 'freeze or filter missing');
   assert(book.SheetNames.indexOf('Unmatched Records') !== -1, 'unmatched sheet missing');
 
@@ -219,7 +231,7 @@ try {
   writeFileSync(writtenPath, writtenBytes);
   const reread = XLSX.read(writtenBytes, { type: 'buffer', cellDates: true, cellNF: true });
   const writtenSheet = reread.Sheets['Tenancy Schedule'];
-  assert(writtenSheet.B4.v instanceof Date && writtenSheet.B4.z === 'mmm-yy', 'written valuation format');
+  assert(writtenSheet.D4.v instanceof Date && writtenSheet.D4.z === 'mmm-yy', 'written valuation format');
   assert(String(writtenBytes).indexOf('ySplit="2"') !== -1, 'frozen header was not written into the workbook');
   assert(String(writtenBytes).indexOf('ht="40"') !== -1 && String(writtenBytes).indexOf('customHeight="1"') !== -1, 'custom row heights were not written');
   assert(String(writtenBytes).indexOf('showGridLines="0"') !== -1, 'worksheet gridlines were not hidden');
@@ -311,9 +323,9 @@ try {
   assert(closeNumber(grand.values.break_date, healthcare.values.break_date), 'grand break WAULT uses units');
   const totalBook = buildWorkbookFromModel(totalModel);
   const totalSheet = totalBook.Sheets['Tenancy Schedule'];
-  assert(totalSheet.L4.t === 'n' && totalSheet.L4.z === '0.00', 'property break cell is a WAULT number');
-  assert(totalSheet.L5.t === 'd' && totalSheet.L5.z === 'dd/mm/yyyy', 'unit break cell stays a date');
-  assert(totalSheet.M9.t === 'n' && totalSheet.L9.z === '0.00', 'sector total WAULT formats');
+  assert(totalSheet.N4.t === 'n' && totalSheet.N4.z === '0.00', 'property break cell is a WAULT number');
+  assert(totalSheet.N5.t === 'd' && totalSheet.N5.z === 'dd/mm/yyyy', 'unit break cell stays a date');
+  assert(totalSheet.O9.t === 'n' && totalSheet.N9.z === '0.00', 'sector total WAULT formats');
   const annualFormat = '\u00a3#,##0';
   const headerRow = {};
   Object.keys(totalSheet).forEach(function (addr) {
@@ -335,8 +347,8 @@ try {
   assert(market.t === 'n' && market.z === annualFormat && market.v === 4460000, 'market rent format ' + market.z);
   assert(fair.t === 'n' && fair.z === annualFormat && fair.v === 5000, 'fair value format ' + fair.z);
   assert(capital.t === 'n' && capital.z === '\u00a3#,##0.00', 'capital value format ' + capital.z);
-  assert(totalSheet.A9.v === 'Healthcare TOTAL' && typeof totalSheet.F9.v === 'number', 'sector total values stay in their own cells');
-  assert(totalSheet.A11.v === 'GRAND TOTAL', 'grand total label');
+  assert(totalSheet.C9.v === 'Healthcare TOTAL' && typeof totalSheet.H9.v === 'number', 'sector total values stay in their own cells');
+  assert(totalSheet.C11.v === 'GRAND TOTAL', 'grand total label');
   function bandMatches(left, right) {
     return left.s.fill.fgColor.rgb === right.s.fill.fgColor.rgb &&
       left.s.font.name === right.s.font.name &&
@@ -348,18 +360,19 @@ try {
   }
   function noInternalVertical(rowIndex) {
     const range = XLSX.utils.decode_range(totalSheet['!ref']);
-    for (let c = 1; c < range.e.c; c += 1) {
+    const firstVisible = 2;
+    for (let c = firstVisible + 1; c < range.e.c; c += 1) {
       const cell = totalSheet[XLSX.utils.encode_cell({ r: rowIndex, c: c })];
       if (!cell || (cell.s.border && (cell.s.border.left || cell.s.border.right))) return false;
     }
-    const first = totalSheet[XLSX.utils.encode_cell({ r: rowIndex, c: 0 })];
+    const first = totalSheet[XLSX.utils.encode_cell({ r: rowIndex, c: firstVisible })];
     const last = totalSheet[XLSX.utils.encode_cell({ r: rowIndex, c: range.e.c })];
     return first.s.border.left && !first.s.border.right && last.s.border.right && !last.s.border.left;
   }
-  assert(bandMatches(totalSheet.A9, totalSheet.A11), 'grand total uses the sector total band');
+  assert(bandMatches(totalSheet.C9, totalSheet.C11), 'grand total uses the sector total band');
   assert(noInternalVertical(8) && noInternalVertical(10), 'summary rows have no internal vertical borders');
-  assert(totalSheet.A9.s.alignment.horizontal === 'left' && totalSheet.A11.s.alignment.horizontal === 'left', 'summary labels stay left');
-  assert(totalSheet.F9.s.alignment.horizontal === 'center' && totalSheet.F11.s.alignment.horizontal === 'center', 'summary values stay centred');
+  assert(totalSheet.C9.s.alignment.horizontal === 'left' && totalSheet.C11.s.alignment.horizontal === 'left', 'summary labels stay left');
+  assert(totalSheet.H9.s.alignment.horizontal === 'center' && totalSheet.H11.s.alignment.horizontal === 'center', 'summary values stay centred');
   assert(!totalSheet['!merges'].some(function (merge) { return merge.s.r === 8 || merge.s.r === 10; }), 'summary rows stay unmerged');
   const waultProperty = formatAt('WAULT (Years)', 3);
   const waultSector = formatAt('WAULT (Years)', 8);
@@ -375,9 +388,9 @@ try {
   assert(formatAt('Fair Value September 2026', 8).z === annualFormat && formatAt('Fair Value September 2026', 10).z === annualFormat, 'summary fair value format');
   assert(formatAt('CV (psf)', 8).z === '\u00a3#,##0.00' && formatAt('CV (psf)', 10).z === '\u00a3#,##0.00', 'summary capital value format');
   assert(formatAt('Area (sq ft)', 8).z === '#,##0' && formatAt('Contracted Rent (pa)', 8).z === annualFormat, 'summary area and rent formats');
-  assert(totalSheet.AA4.t === 'n' && totalSheet.AA4.z === '£#,##0.00', 'capital value format');
-  assert(totalSheet.AC4.t === 'n' && totalSheet.AC4.z === '£#,##0', 'fair value format');
-  assert(totalSheet.AC1.v === 'Fair Value September 2026', 'written fair value heading');
+  assert(formatAt('CV (psf)', 3).t === 'n' && formatAt('CV (psf)', 3).z === '£#,##0.00', 'capital value format');
+  assert(formatAt('Fair Value September 2026', 3).t === 'n' && formatAt('Fair Value September 2026', 3).z === '£#,##0', 'fair value format');
+  assert(formatAt('Fair Value September 2026', 0).v === 'Fair Value September 2026', 'written fair value heading');
 
   const propertyOnly = transformToPropertySummary(propertyParsed);
   assert(propertyOnly.ok && propertyOnly.rows.length === 6, 'property only dropped a valid property');
@@ -547,7 +560,7 @@ try {
     const values = [15321, 15321, 0, 12000, 15321];
     const refs = base.concat(labels.map(function (label) {
       return { section: 'Occupied Area (SF)', field: label };
-    }));
+    })).concat([{ section: 'Capital Cost', field: 'Aug-2027' }]);
     const row = base.map(function (ref) {
       if (ref.field === 'Property Name') return 'Asset 1';
       if (ref.field === 'Suite') return '1';
@@ -555,7 +568,7 @@ try {
       if (ref.field === 'Lease ID') return 'L1';
       if (ref.field === 'Lease Start' || ref.field === 'Lease Expiry') return new Date(2024, 0, 1);
       return 'x';
-    }).concat(values);
+    }).concat(values).concat([0]);
     const parsed = await parseBuffer(makeWorkbook(refs, [row]), 'area.xlsx', 'unit');
     const propertyBase = getRequiredPropertyFields().concat([{ section: 'Occupied Area', field: 'Aug-2027' }]);
     const propertyRow = propertyBase.map(function (ref) {
@@ -636,7 +649,7 @@ try {
     assert(sampleModel.ok && samplePropertyOnly.ok && sampleCompare.ok, 'sample fixtures failed');
     assert(sampleModel.scheduleRows.some(function (row) { return row.kind === 'sector'; }), 'sample sector grouping');
     const sampleBook = buildWorkbookFromModel(sampleModel);
-    assert(sampleBook.Sheets['Tenancy Schedule'].A1.v === 'Property Reference', 'sample schedule header');
+    assert(sampleBook.Sheets['Tenancy Schedule'].C1.v === 'Property Reference', 'sample schedule header');
     function close(value, expected) {
       return typeof value === 'number' && Math.abs(value - expected) < 0.02;
     }
@@ -652,6 +665,294 @@ try {
   } else {
     console.log('sample files not present; synthetic fixtures were used');
   }
+
+  const { setReportLayout, resetReportLayout, defaultOptionalIds } = await vite.ssrLoadModule('/src/logic/reportLayout.js');
+  const { assetUnitReference } = await vite.ssrLoadModule('/src/standardiser/transform.js');
+  assert(assetUnitReference('Copper House', 'Unit 01') === 'Copper House_Unit 01', 'joined asset unit reference');
+  assert(assetUnitReference('Copper House', ' ') === 'Copper House', 'address-only reference');
+  assert(assetUnitReference('', 'Unit 01') === 'Unit 01', 'unit-only reference');
+  const referenceUnit = totalModel.scheduleRows.find(function (row) { return row.kind === 'unit' && row.values.unit === 'A'; });
+  assert(referenceUnit.values.asset_unit_reference === 'Asset 1_A', 'unit reference uses that row ' + referenceUnit.values.asset_unit_reference);
+  assert(totalModel.scheduleRows.find(function (row) { return row.kind === 'property'; }).values.asset_unit_reference == null, 'property reference column stays blank');
+  assert(totalModel.scheduleRows.find(function (row) { return row.kind === 'sectorTotal'; }).values.tenant_reference == null, 'sector tenant reference stays blank');
+
+  setReportLayout(defaultOptionalIds().filter(function (id) { return id !== 'deemed_rent_psf' && id !== 'area_sqft'; }));
+  const dependencyModel = transformToSchedule(
+    await parseBuffer(secondProperty, 'layout-property.xlsx', 'property'),
+    await parseBuffer(totalUnits, 'layout-units.xlsx', 'unit')
+  );
+  assert(!dependencyModel.columns.some(function (column) { return column.id === 'area_sqft' || column.id === 'deemed_rent_psf'; }), 'removed fields are absent');
+  assert(dependencyModel.columns[0].id === 'asset_unit_reference' && dependencyModel.columns[2].id === 'property_reference' && dependencyModel.columns[5].id === 'address', 'fixed columns stay first');
+  const dependencyAsset = dependencyModel.scheduleRows.find(function (row) { return row.kind === 'property' && row.values.property_reference === 'ASSET-1'; });
+  assert(closeNumber(dependencyAsset.values.cv_psf, 5000 / 19998), 'capital value still uses internal area');
+  const ids = defaultOptionalIds().filter(function (id) { return id !== 'mwault_year'; });
+  ids.splice(ids.indexOf('area_sqft'), 0, 'mwault_year');
+  setReportLayout(ids);
+  const reordered = transformToSchedule(
+    await parseBuffer(secondProperty, 'order-property.xlsx', 'property'),
+    await parseBuffer(totalUnits, 'order-units.xlsx', 'unit')
+  );
+  const waultAt = reordered.columns.findIndex(function (column) { return column.id === 'mwault_year'; });
+  const areaAt = reordered.columns.findIndex(function (column) { return column.id === 'area_sqft'; });
+  assert(waultAt !== -1 && waultAt < areaAt, 'WAULT can be placed before Area');
+  const reorderedSheet = buildWorkbookFromModel(reordered).Sheets['Tenancy Schedule'];
+  const reorderedHeaders = {};
+  Object.keys(reorderedSheet).forEach(function (addr) {
+    if (addr[0] === '!') return;
+    const decoded = XLSX.utils.decode_cell(addr);
+    if (decoded.r === 0) reorderedHeaders[reorderedSheet[addr].v] = decoded.c;
+  });
+  assert(reorderedSheet[XLSX.utils.encode_cell({ r: 3, c: reorderedHeaders['WAULT (Years)'] })].z === '0.00', 'moved WAULT keeps 0.00');
+  assert(reorderedSheet[XLSX.utils.encode_cell({ r: 3, c: reorderedHeaders['Area (sq ft)'] })].z === '#,##0', 'moved Area keeps its format');
+  const sectorTotal = reordered.scheduleRows.find(function (row) { return row.kind === 'sectorTotal'; });
+  assert(closeNumber(sectorTotal.values.mwault_year, (10 * 100 + 10 * 100 + 5 * 100) / 300), 'sector WAULT follows the field after reorder');
+  resetReportLayout();
+
+  const currentJune = new Date(2026, 8, 30);
+  const previousJune = new Date(2026, 5, 30);
+  function comparisonProperty(name, ref, sector, say, erv, date) {
+    return propertyMap(name, sector, {
+      'General|External ID': ref,
+      'General|Say Value': say,
+      'General|Rental Value (ERV)': erv,
+      'General|Traditional Valuation Date': date,
+    });
+  }
+  function comparisonUnit(name, suite, erv) {
+    return unitMap(name, suite, suite, { 'Variable|Rental Value (ERV)': erv });
+  }
+  const currentPropertyBytes = makeWorkbook(propertyRefs, [
+    comparisonProperty('Alpha', 'A', 'Healthcare', 44100000, 5000, currentJune),
+    comparisonProperty('Beta', 'B', 'Healthcare', 17820000, 2000, currentJune),
+    comparisonProperty('Gamma', 'C', 'Offices', 1000000, 100, currentJune),
+    comparisonProperty('Echo', 'E', 'Healthcare', 10000000, 50, currentJune),
+  ]);
+  const previousPropertyBytes = makeWorkbook(propertyRefs, [
+    comparisonProperty('Alpha', 'A', 'Healthcare', 46800000, 4000, previousJune),
+    comparisonProperty('Beta', 'B', 'Healthcare', 17720000, 1500, previousJune),
+    comparisonProperty('Delta', 'D', 'Healthcare', 999, 10, previousJune),
+    comparisonProperty('Echo', 'E', 'Healthcare', 10000000, 80, previousJune),
+  ]);
+  const currentUnitBytes = makeWorkbook(unitRefs, [
+    comparisonUnit('Alpha', 'Unit 01', 10),
+    comparisonUnit('Alpha', 'Unit 02', 20),
+    comparisonUnit('Alpha', 'Unit 03', 30),
+    comparisonUnit('Beta', 'Unit 01', 50),
+    comparisonUnit('Echo', 'Unit 01', 1),
+    comparisonUnit('Echo', 'Unit 02', 1),
+  ]);
+  const previousUnitBytes = makeWorkbook(unitRefs, [
+    comparisonUnit('Alpha', 'Unit 01', 15),
+    comparisonUnit('Alpha', 'Unit 03', 25),
+    comparisonUnit('Alpha', 'Unit 04', 99),
+    comparisonUnit('Beta', 'Unit 01', 80),
+    comparisonUnit('Echo', 'Unit 01', 5000000),
+    comparisonUnit('Echo', 'Unit 02', 3000000),
+    comparisonUnit('Echo', 'Unit 99', 2000000),
+  ]);
+  setReportLayout(defaultOptionalIds(), { market_rent_pa: true });
+  const valuationCompare = transformToSchedule(
+    await parseBuffer(currentPropertyBytes, 'current-property.xlsx', 'property'),
+    await parseBuffer(currentUnitBytes, 'current-units.xlsx', 'unit'),
+    {
+      previousProperty: await parseBuffer(previousPropertyBytes, 'previous-property.xlsx', 'property'),
+      previousUnit: await parseBuffer(previousUnitBytes, 'previous-units.xlsx', 'unit'),
+    }
+  );
+  assert(valuationCompare.ok, 'comparison schedule generates');
+  assert(!valuationCompare.scheduleRows.some(function (row) { return row.values && row.values.property_reference === 'D'; }), 'previous-only property is ignored');
+  assert(!valuationCompare.scheduleRows.some(function (row) { return row.kind === 'unit' && row.values.unit === 'Unit 04'; }), 'previous-only unit is ignored');
+  const fairAt = valuationCompare.columns.findIndex(function (column) { return column.id === 'fair_value'; });
+  assert(valuationCompare.columns[fairAt + 1].id === 'fair_value__previous' && valuationCompare.columns[fairAt + 2].id === 'fair_value__change', 'fair value comparison columns stay beside the field');
+  const rentAt = valuationCompare.columns.findIndex(function (column) { return column.id === 'market_rent_pa'; });
+  assert(valuationCompare.columns[rentAt + 1].id === 'market_rent_pa__previous', 'market rent previous column is adjacent');
+  assert(!valuationCompare.columns.some(function (column) { return column.id === 'market_rent_pa__change'; }), 'market rent has no change column');
+  const alpha = valuationCompare.scheduleRows.find(function (row) { return row.kind === 'property' && row.values.property_reference === 'A'; });
+  const beta = valuationCompare.scheduleRows.find(function (row) { return row.kind === 'property' && row.values.property_reference === 'B'; });
+  const gamma = valuationCompare.scheduleRows.find(function (row) { return row.kind === 'property' && row.values.property_reference === 'C'; });
+  const echo = valuationCompare.scheduleRows.find(function (row) { return row.kind === 'property' && row.values.property_reference === 'E'; });
+  assert(alpha.values.fair_value__previous === 46800000 && gamma.values.fair_value__previous == null, 'property match uses External ID and unmatched stays blank');
+  assert(closeNumber(alpha.values.fair_value__change, (44100000 / 46800000) - 1), 'fair value change uses current divided by previous');
+  const echoUnits = valuationCompare.scheduleRows.filter(function (row) { return row.kind === 'unit' && row.matchKey === echo.matchKey; });
+  const echoUnitRent = echoUnits.reduce(function (sum, row) { return sum + (row.values.market_rent_pa__previous || 0); }, 0);
+  assert(echo.values.fair_value__previous === 10000000 && echoUnitRent === 8000000, 'previous fair value stays the direct property value when matched units would only reconstruct 8000000');
+  const alphaUnits = valuationCompare.scheduleRows.filter(function (row) { return row.kind === 'unit' && row.matchKey === alpha.matchKey; });
+  const unit01 = alphaUnits.find(function (row) { return row.values.unit === 'Unit 01'; });
+  const unit02 = alphaUnits.find(function (row) { return row.values.unit === 'Unit 02'; });
+  const unit03 = alphaUnits.find(function (row) { return row.values.unit === 'Unit 03'; });
+  assert(unit01.values.market_rent_pa__previous === 15 && unit03.values.market_rent_pa__previous === 25, 'matched units keep their own previous rent');
+  assert(unit02.values.market_rent_pa__previous == null, 'unmatched unit comparison stays blank');
+  assert(unit01.values.fair_value__previous == null && unit01.values.fair_value__change == null, 'unit fair value comparison stays blank');
+  const betaUnit = valuationCompare.scheduleRows.find(function (row) { return row.kind === 'unit' && row.values.unit === 'Unit 01' && row.values.market_rent_pa === 50; });
+  assert(betaUnit.values.market_rent_pa__previous === 80, 'same unit name in another property does not cross-match');
+  const valuationHealthcare = valuationCompare.scheduleRows.find(function (row) { return row.kind === 'sectorTotal' && row.sector === 'Healthcare'; });
+  assert(valuationHealthcare.values.fair_value__previous === 46800000 + 17720000 + 10000000, 'sector previous fair value sums matched property values');
+  const valuationGrand = valuationCompare.scheduleRows.find(function (row) { return row.kind === 'grandTotal'; });
+  assert(valuationGrand.values.fair_value__previous === 46800000 + 17720000 + 10000000, 'grand previous fair value ignores previous-only properties');
+  const valuationBook = buildWorkbookFromModel(valuationCompare).Sheets['Tenancy Schedule'];
+  function cellFor(row, columnId) {
+    const column = valuationCompare.columns.findIndex(function (item) { return item.id === columnId; });
+    const rowIndex = valuationCompare.scheduleRows.indexOf(row) + 2;
+    return valuationBook[XLSX.utils.encode_cell({ r: rowIndex, c: column })];
+  }
+  assert(cellFor(alpha, 'fair_value').s.font.color.rgb === 'FF0000' && cellFor(alpha, 'fair_value').s.font.bold === true, 'lower current fair value is exact red and stays bold');
+  assert(cellFor(alpha, 'fair_value').s.fill.fgColor.rgb !== 'FFFFCC', 'property fair value does not use the unit change fill');
+  assert(cellFor(alpha, 'fair_value__previous').s.font.color.rgb === '000000', 'previous fair value stays neutral');
+  assert(cellFor(alpha, 'fair_value__change').s.font.color.rgb === 'FF0000' && cellFor(alpha, 'fair_value__change').z === '0.00%', 'negative fair value change is exact red percent');
+  assert(cellFor(beta, 'fair_value').s.font.color.rgb === '00B050', 'higher current fair value is exact green');
+  assert(cellFor(beta, 'fair_value__change').s.font.color.rgb === '00B050', 'positive fair value change is exact green');
+  assert(cellFor(gamma, 'fair_value').s.font.color.rgb === '000000' && cellFor(gamma, 'fair_value').s.fill.fgColor.rgb !== 'FFFFCC', 'missing previous value is not coloured');
+  const lowerUnit = cellFor(unit01, 'market_rent_pa');
+  const higherUnit = cellFor(unit03, 'market_rent_pa');
+  const unmatchedUnit = cellFor(unit02, 'market_rent_pa');
+  const previousUnitRent = cellFor(unit01, 'market_rent_pa__previous');
+  assert(lowerUnit.s.fill.fgColor.rgb === 'FFFFCC' && lowerUnit.s.font.color.rgb === 'FF0000' && lowerUnit.s.font.bold !== true, 'decreased unit current value is yellow and exact red, not bold');
+  assert(higherUnit.s.fill.fgColor.rgb === 'FFFFCC' && higherUnit.s.font.color.rgb === '00B050' && higherUnit.s.font.bold !== true, 'increased unit current value is yellow and exact green, not bold');
+  assert(unmatchedUnit.s.fill.fgColor.rgb !== 'FFFFCC' && unmatchedUnit.s.font.color.rgb === '000000', 'unit with no previous value stays unhighlighted');
+  assert(previousUnitRent.s.fill.fgColor.rgb !== 'FFFFCC' && previousUnitRent.s.font.color.rgb === '000000', 'previous unit value stays neutral');
+  assert(cellFor(valuationHealthcare, 'fair_value').s.font.bold === true && cellFor(valuationGrand, 'fair_value__change').s.font.color.rgb === 'FF0000', 'summary comparison keeps bold text and uses exact red');
+  const valuationHeaders = Object.keys(valuationBook).filter(function (addr) { return addr[0] !== '!' && XLSX.utils.decode_cell(addr).r === 0; }).map(function (addr) { return valuationBook[addr].v; });
+  assert(valuationHeaders.indexOf('Fair Value\nSeptember 2026') !== -1 && valuationHeaders.indexOf('Fair Value\nJune 2026') !== -1, 'fair value headers use each valuation date');
+  assert(valuationHeaders.indexOf('Market Rent (pa)\nSeptember 2026') !== -1 && valuationHeaders.indexOf('Market Rent (pa)\nJune 2026') !== -1, 'compared field headers use both valuation dates');
+  const propertyOnlyPrevious = transformToSchedule(
+    await parseBuffer(currentPropertyBytes, 'current-property.xlsx', 'property'),
+    await parseBuffer(currentUnitBytes, 'current-units.xlsx', 'unit'),
+    { previousProperty: await parseBuffer(previousPropertyBytes, 'previous-property.xlsx', 'property') }
+  );
+  assert(propertyOnlyPrevious.columns.some(function (column) { return column.id === 'fair_value__previous'; }), 'previous property alone still enables fair value comparison');
+  assert(propertyOnlyPrevious.scheduleRows.find(function (row) { return row.kind === 'unit' && row.values.unit === 'Unit 01' && row.values.market_rent_pa === 10; }).values.market_rent_pa__previous == null, 'unit comparison stays blank without a previous unit file');
+  const plain = transformToSchedule(
+    await parseBuffer(currentPropertyBytes, 'current-property.xlsx', 'property'),
+    await parseBuffer(currentUnitBytes, 'current-units.xlsx', 'unit')
+  );
+  assert(!plain.columns.some(function (column) { return column.id === 'fair_value__previous' || column.id === 'fair_value__change'; }), 'fair value comparison stays hidden until a previous property file is loaded');
+
+  const { describeRule, methodLabel } = await vite.ssrLoadModule('/src/logic/describe.js');
+  const { getNumberFormat } = await vite.ssrLoadModule('/src/excel/writer.js');
+  const capColumn = DEFAULT_SCHEDULE_COLUMNS.find(function (column) { return column.id === 'cap_ex'; });
+  assert(capColumn.format === '£#,##0;-£#,##0', 'cap ex uses a normal negative currency format');
+  assert(capColumn.format.indexOf('[Red]') === -1, 'cap ex format has no red negative colour');
+  assert(getNumberFormat('cap_ex', -15000) === '£#,##0;-£#,##0'.replace(/£/g, '\u00a3'), 'excel cap ex format has no decimals or red');
+  assert(methodLabel(capColumn.logic.property) === 'Source Field', 'property cap ex value method');
+  assert(methodLabel(capColumn.logic.unit) === 'Aggregated Source / Derived Aggregation', 'unit cap ex value method');
+  assert(methodLabel(capColumn.logic.sectorTotal) === 'Summary Aggregation', 'sector cap ex value method');
+  assert(describeRule(capColumn.logic.property, 'property', DEFAULT_SCHEDULE_COLUMNS, 'cap_ex') === 'Property › General › Capital Costs\nUses Capital Costs directly from the Property Level source.', 'property cap ex logic text');
+  assert(describeRule(capColumn.logic.unit, 'unit', DEFAULT_SCHEDULE_COLUMNS, 'cap_ex') === 'Unit / TS › Capital Cost › All Period Columns\nAggregation: Sum\nSign Convention: Cost / Outflow\nOutput: Negative absolute value\nSums all Capital Cost period values for the current Unit and reports the result as a negative cost.', 'unit cap ex logic text');
+  assert(capColumn.logic.unit.sign === 'cost' && !capColumn.logic.property.sign, 'only unit cap ex uses the cost sign');
+  assert(describeRule(capColumn.logic.sectorTotal, 'sectorTotal', DEFAULT_SCHEDULE_COLUMNS, 'cap_ex') === 'SUM Property › General › Capital Costs in Sector', 'sector cap ex logic text');
+  assert(describeRule(capColumn.logic.grandTotal, 'grandTotal', DEFAULT_SCHEDULE_COLUMNS, 'cap_ex') === 'SUM Property › General › Capital Costs in Portfolio', 'grand cap ex logic text');
+  assert(capColumn.logic.unit.ref.section === 'Capital Cost' && capColumn.logic.unit.ref.selection === 'allPeriods' && capColumn.logic.unit.ref.aggregation === 'sum' && capColumn.logic.unit.ref.scope === 'currentUnitRow', 'unit cap ex sums every period on the current row');
+  assert(capColumn.logic.property.ref.section === 'General' && capColumn.logic.property.ref.field === 'Capital Costs', 'property cap ex is the static capital costs field');
+  assert(defaultOptionalIds().indexOf('cap_ex') !== -1, 'cap ex stays an optional report field');
+  const capDraft = spec.document.productionDefinition.columns.find(function (column) { return column.id === 'cap_ex'; });
+  assert(capDraft && capDraft.logic.property.ref.field === 'Capital Costs' && capDraft.logic.unit.ref.section === 'Capital Cost' && capDraft.logic.sectorTotal.summary === 'sum' && capDraft.logic.sectorTotal.scope === 'properties', 'draft export carries the shared cap ex definition');
+
+  const capPropertyRefs = propertyRefs.concat([
+    { section: 'Capital Expenditure', field: 'Aug-2027' },
+    { section: 'Capital Expenditure', field: 'Aug-2028' },
+  ]);
+  const capUnitRefs = unitRefs.concat([
+    { section: 'Capital Cost', field: 'Aug-2028' },
+    { section: 'Capital Cost', field: 'Aug-2029' },
+  ]);
+  const capPropertyBytes = makeWorkbook(capPropertyRefs, [
+    valuesRow(capPropertyRefs, { 'General|Property Name': 'Asset A', 'General|Sector': 'Healthcare', 'General|External ID': 'ASSET-A', 'General|Traditional Valuation Date': valuationDate, 'General|City': 'Leeds', 'General|Capital Costs': -130000, 'Capital Expenditure|Aug-2027': 999999, 'Capital Expenditure|Aug-2028': 1 }),
+    valuesRow(capPropertyRefs, { 'General|Property Name': 'Asset B', 'General|Sector': 'Healthcare', 'General|External ID': 'ASSET-B', 'General|Traditional Valuation Date': valuationDate, 'General|City': 'Leeds', 'General|Capital Costs': 70000, 'Capital Expenditure|Aug-2027': 500000 }),
+    valuesRow(capPropertyRefs, { 'General|Property Name': 'Asset C', 'General|Sector': 'Offices', 'General|External ID': 'ASSET-C', 'General|Traditional Valuation Date': valuationDate, 'General|City': 'Leeds', 'General|Capital Costs': 50000, 'Capital Expenditure|Aug-2027': 800000 }),
+    valuesRow(capPropertyRefs, { 'General|Property Name': 'Asset Blank', 'General|Sector': 'Healthcare', 'General|External ID': 'ASSET-BLANK', 'General|Traditional Valuation Date': valuationDate, 'General|City': 'Leeds', 'General|Capital Costs': null }),
+  ]);
+  const capUnitBytes = makeWorkbook(capUnitRefs, [
+    valuesRow(capUnitRefs, { 'General|Property Name': 'Asset A', 'General|Suite': 'A', 'General|Tenant Name': 'Tenant A', 'Capital Cost|Aug-2027': 10000, 'Capital Cost|Aug-2028': 5000, 'Capital Cost|Aug-2029': 0 }),
+    valuesRow(capUnitRefs, { 'General|Property Name': 'Asset A', 'General|Suite': 'B', 'General|Tenant Name': 'Tenant B', 'Capital Cost|Aug-2027': 2000, 'Capital Cost|Aug-2028': 3000 }),
+    valuesRow(capUnitRefs, { 'General|Property Name': 'Asset B', 'General|Suite': 'C', 'General|Tenant Name': 'Tenant C', 'Capital Cost|Aug-2027': 999999 }),
+  ]);
+  const capModel = transformToSchedule(
+    await parseBuffer(capPropertyBytes, 'cap-property.xlsx', 'property'),
+    await parseBuffer(capUnitBytes, 'cap-units.xlsx', 'unit')
+  );
+  const capPropertyA = capModel.scheduleRows.find(function (row) { return row.kind === 'property' && row.values.address === 'Asset A'; });
+  const capPropertyB = capModel.scheduleRows.find(function (row) { return row.kind === 'property' && row.values.address === 'Asset B'; });
+  const capPropertyC = capModel.scheduleRows.find(function (row) { return row.kind === 'property' && row.values.address === 'Asset C'; });
+  const capPropertyBlank = capModel.scheduleRows.find(function (row) { return row.kind === 'property' && row.values.address === 'Asset Blank'; });
+  const capUnitA = capModel.scheduleRows.find(function (row) { return row.kind === 'unit' && row.values.unit === 'A'; });
+  const capUnitB = capModel.scheduleRows.find(function (row) { return row.kind === 'unit' && row.values.unit === 'B'; });
+  const capHealthcare = capModel.scheduleRows.find(function (row) { return row.kind === 'sectorTotal' && row.sector === 'Healthcare'; });
+  const capGrand = capModel.scheduleRows.find(function (row) { return row.kind === 'grandTotal'; });
+  assert(capPropertyA && capPropertyA.values.cap_ex === -130000, 'property cap ex keeps the source sign, got ' + (capPropertyA && capPropertyA.values.cap_ex));
+  assert(capPropertyB && capPropertyB.values.cap_ex === 70000, 'positive property cap ex is not flipped by the unit rule');
+  assert(capPropertyC && capPropertyC.values.cap_ex === 50000, 'property C cap ex');
+  assert(capPropertyBlank && capPropertyBlank.values.cap_ex == null, 'blank capital costs stays blank');
+  assert(capUnitA && capUnitA.values.cap_ex === -15000, 'unit A cap ex is a negative cost, got ' + (capUnitA && capUnitA.values.cap_ex));
+  assert(capUnitB && capUnitB.values.cap_ex === -5000, 'unit B cap ex stays on its own row, got ' + (capUnitB && capUnitB.values.cap_ex));
+  const capUnitC = capModel.scheduleRows.find(function (row) { return row.kind === 'unit' && row.values.unit === 'C'; });
+  assert(capUnitC && capUnitC.values.cap_ex === -999999, 'unit C cap ex is row-scoped');
+  assert(capHealthcare && capHealthcare.values.cap_ex === -60000, 'sector cap ex sums property capital costs once, got ' + (capHealthcare && capHealthcare.values.cap_ex));
+  assert(capGrand && capGrand.values.cap_ex === -10000, 'grand cap ex sums property capital costs only, got ' + (capGrand && capGrand.values.cap_ex));
+  const capBook = buildWorkbookFromModel(capModel);
+  const capSheet = capBook.Sheets['Tenancy Schedule'];
+  const capCol = capModel.columns.findIndex(function (column) { return column.id === 'cap_ex'; });
+  const capExcelRow = capModel.scheduleRows.findIndex(function (row) { return row.kind === 'property' && row.values.address === 'Asset A'; });
+  const capCell = capSheet[XLSX.utils.encode_cell({ r: capExcelRow + 2, c: capCol })];
+  const capFormat = '£#,##0;-£#,##0'.replace(/£/g, '\u00a3');
+  assert(capCell && capCell.v === -130000 && capCell.z === capFormat && capCell.z.indexOf('[Red]') === -1 && capCell.s.font.color.rgb === '000000', 'negative property cap ex stays black');
+  const capUnitExcel = capModel.scheduleRows.findIndex(function (row) { return row.kind === 'unit' && row.values.unit === 'A'; });
+  const capUnitCell = capSheet[XLSX.utils.encode_cell({ r: capUnitExcel + 2, c: capCol })];
+  assert(capUnitCell && capUnitCell.v === -15000 && capUnitCell.z === capFormat && capUnitCell.s.font.color.rgb === '000000', 'negative unit cap ex stays black');
+  const capTotalExcel = capModel.scheduleRows.findIndex(function (row) { return row.kind === 'sectorTotal' && row.sector === 'Healthcare'; });
+  const capTotalCell = capSheet[XLSX.utils.encode_cell({ r: capTotalExcel + 2, c: capCol })];
+  assert(capTotalCell && capTotalCell.v === -60000 && capTotalCell.s.font.color.rgb === 'FFFFFF', 'sector cap ex keeps the summary font');
+  const capGrandExcel = capModel.scheduleRows.findIndex(function (row) { return row.kind === 'grandTotal'; });
+  const capGrandCell = capSheet[XLSX.utils.encode_cell({ r: capGrandExcel + 2, c: capCol })];
+  assert(capGrandCell && capGrandCell.v === -10000 && capGrandCell.s.font.color.rgb === 'FFFFFF', 'grand cap ex keeps the summary font');
+  ['sector', 'property', 'unit', 'sectorTotal', 'grandTotal'].forEach(function (kind) {
+    const rowIndex = capModel.scheduleRows.findIndex(function (row) { return row.kind === kind; });
+    assert(rowIndex !== -1 && capSheet['!rows'][rowIndex + 2].hpt === 24, kind + ' cap workbook row height');
+  });
+
+  const missingCapitalCosts = propertyRefs.filter(function (ref) { return fieldKey(ref) !== 'General|Capital Costs'; });
+  const missingCapitalCostGroup = unitRefs.filter(function (ref) { return ref.section !== 'Capital Cost'; });
+  const nonPeriodCapitalCost = unitRefs.map(function (ref) {
+    return ref.section === 'Capital Cost' ? { section: 'Capital Cost', field: 'Total' } : ref;
+  });
+  const missingCosts = await expectParse(makeWorkbook(missingCapitalCosts, [missingCapitalCosts.map(function () { return 'x'; })]), 'no-costs.xlsx', 'property');
+  const missingGroupCap = await expectParse(makeWorkbook(missingCapitalCostGroup, [missingCapitalCostGroup.map(function () { return 'x'; })]), 'no-cap-group.xlsx', 'unit');
+  const nonPeriodCap = await expectParse(makeWorkbook(nonPeriodCapitalCost, [nonPeriodCapitalCost.map(function (ref) {
+    if (ref.field === 'Property Name') return 'Asset 1';
+    if (ref.field === 'Suite') return '1';
+    if (ref.field === 'Lease ID') return 'L1';
+    return 'x';
+  })]), 'cap-total.xlsx', 'unit');
+  assert(typeof missingCosts === 'string' && missingCosts.indexOf('General > Capital Costs') !== -1, 'property validation requires Capital Costs: ' + missingCosts);
+  assert(typeof missingGroupCap === 'string' && missingGroupCap.indexOf('Capital Cost') !== -1, 'unit validation requires Capital Cost group: ' + missingGroupCap);
+  assert(typeof nonPeriodCap === 'string' && nonPeriodCap.indexOf('No period columns found under:') !== -1 && nonPeriodCap.indexOf('Capital Cost') !== -1, 'unit capital cost accepts any period date: ' + nonPeriodCap);
+
+  const { roundedChangePercentagePoints, fairValueChangeTone } = await vite.ssrLoadModule('/src/logic/comparison.js');
+  assert(roundedChangePercentagePoints(0.00004) === 0 && fairValueChangeTone(0.00004) === '', 'fair value change of +0.004% rounds to no change');
+  assert(roundedChangePercentagePoints(-0.00004) === 0 && fairValueChangeTone(-0.00004) === '' && Object.is(roundedChangePercentagePoints(-0.00004), 0), 'fair value change of -0.004% rounds to positive zero');
+  assert(roundedChangePercentagePoints(0.00006) === 0.01 && fairValueChangeTone(0.00006) === 'up', 'fair value change of +0.006% rounds to an increase');
+  assert(roundedChangePercentagePoints(-0.00006) === -0.01 && fairValueChangeTone(-0.00006) === 'down', 'fair value change of -0.006% rounds to a decrease');
+  const toleranceRows = [
+    { name: 'up-noise', ratio: 0.00004, value: 0, color: '000000' },
+    { name: 'down-noise', ratio: -0.00004, value: 0, color: '000000' },
+    { name: 'up', ratio: 0.00006, value: 0.00006, color: '00B050' },
+    { name: 'down', ratio: -0.00006, value: -0.00006, color: 'FF0000' },
+  ];
+  const toleranceModel = {
+    columns: [
+      { id: 'fair_value', label: 'Fair Value', comparisonRole: 'current', parentId: 'fair_value', directionHighlight: false },
+      { id: 'fair_value__change', label: 'Change %', comparisonRole: 'change', parentId: 'fair_value', format: '0.00%' },
+    ],
+    scheduleRows: toleranceRows.map(function (item) {
+      return { kind: 'property', values: { fair_value: 1, fair_value__change: item.ratio } };
+    }),
+    unmatchedRows: [],
+  };
+  const toleranceSheet = buildWorkbookFromModel(toleranceModel).Sheets['Tenancy Schedule'];
+  toleranceRows.forEach(function (item, index) {
+    const cell = toleranceSheet[XLSX.utils.encode_cell({ r: index + 2, c: 1 })];
+    assert(cell.v === item.value && Object.is(cell.v, item.value) && cell.s.font.color.rgb === item.color && cell.z === '0.00%', 'fair value change ' + item.name + ' uses two-decimal percentage tolerance');
+  });
+  resetReportLayout();
 
   console.log(failures.length ? 'REGRESSION FAILED' : 'OK: regression');
 } catch (err) {

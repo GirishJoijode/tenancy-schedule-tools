@@ -26,6 +26,7 @@ export const PROPERTY_SOURCE_FIELDS = {
   equivalentYield: sourceField('General', 'Equivalent Yield (at Valuation Date)'),
   reversionaryYield: sourceField('General', 'Reversionary Yield (at Valuation Date)'),
   sayValue: sourceField('General', 'Say Value'),
+  capitalCosts: sourceField('General', 'Capital Costs'),
   occupiedArea: periodGroup('property', 'Occupied Area', 'earliestPeriod'),
 };
 
@@ -46,6 +47,9 @@ export const UNIT_SOURCE_FIELDS = {
   voidMonths: sourceField('Variable', 'Void'),
   freeRentMonths: sourceField('Variable', 'Free Rent (Months)'),
   occupiedArea: Object.assign(periodGroup('unit', 'Occupied Area (SF)', 'allPeriods', 'max'), {
+    scope: 'currentUnitRow',
+  }),
+  capitalCost: Object.assign(periodGroup('unit', 'Capital Cost', 'allPeriods', 'sum'), {
     scope: 'currentUnitRow',
   }),
   hardcoreYield: sourceField('Traditional Valuation', 'Hardcore Yield'),

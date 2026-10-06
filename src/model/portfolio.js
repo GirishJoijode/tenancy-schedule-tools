@@ -7,6 +7,23 @@ function outputRule(column, kind) {
   return kind === 'property' ? column.logic.property : column.logic.unit;
 }
 
+function numericOutput(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    var parsed = Number(value.replace(/,/g, '').trim());
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function applyOutputSign(value, rule) {
+  if (!rule || rule.sign !== 'cost') return value;
+  var number = numericOutput(value);
+  if (number === null) return null;
+  var signed = -Math.abs(number);
+  return signed === 0 ? 0 : signed;
+}
+
 export function standardValuesFor(kind, parsedRow, parsedWorkbook) {
   var fileType = kind === 'property' ? 'property' : 'unit';
   var values = {};
@@ -14,7 +31,10 @@ export function standardValuesFor(kind, parsedRow, parsedWorkbook) {
     var col = DEFAULT_SCHEDULE_COLUMNS[i];
     var rule = outputRule(col, kind);
     if (rule && (rule.method === 'source' || rule.method === 'aggregatedSource')) {
-      values[col.id] = readSourceValue(parsedRow, parsedWorkbook.columns, fileType, rule.ref);
+      values[col.id] = applyOutputSign(
+        readSourceValue(parsedRow, parsedWorkbook.columns, fileType, rule.ref),
+        rule
+      );
     } else if (rule && rule.method === 'fixed') {
       values[col.id] = rule.value;
     } else {

@@ -169,6 +169,7 @@ function sourceEditor(column, context, rule, hits) {
     '<label>Field<input data-edit="field" value="' + escapeHtml(ref.field || '') + '"></label>' +
     '</div>' +
     '<p class="config-kicker">Resolved source</p><p class="config-preview" data-role="resolved">' + escapeHtml(sourcePath(rule, context)) + '</p>' +
+    (column.id === 'cap_ex' ? '<p class="config-note">Uses Capital Costs directly from the Property Level source.</p>' : '') +
     (column.id === 'break_date' && context === 'unit' ? '<p class="config-kicker">Format</p><p class="config-preview">dd/mm/yyyy</p><p class="config-note">Unit rows show the Effective Break date. Property, Sector Total and Grand Total rows in this column show WAULT to Break.</p>' : '') +
     validationLine(hits)
   );
@@ -190,7 +191,11 @@ function aggregatedEditor(rule, context, hits) {
     option('allPeriods', 'All Period Columns', ref.selection) + option('earliestPeriod', 'Earliest Period', ref.selection) + option('latestPeriod', 'Latest Period', ref.selection) + option('firstPeriod', 'First Period Column', ref.selection) + option('lastPeriod', 'Last Period Column', ref.selection) +
     '</select></label></div>' +
     '<p class="config-kicker">Preview</p><p class="config-preview" data-role="resolved">' + escapeHtml(aggregatedPreview(rule, context)) + '</p>' +
-    (ref.scope === 'currentUnitRow' || context === 'unit' ? '<p class="config-preview">Scope: Current Unit Source Row</p><p class="config-note">Uses the maximum occupied area across all available period columns for this Unit only.</p>' : '') +
+    (ref.section === 'Capital Cost'
+      ? '<p class="config-preview">Aggregation: Sum</p><p class="config-preview">Sign Convention: Cost / Outflow</p><p class="config-preview">Output: Negative absolute value</p><p class="config-note">Sums all Capital Cost period values for the current Unit and reports the result as a negative cost.</p>'
+      : (ref.scope === 'currentUnitRow' || ref.section === 'Occupied Area (SF)'
+        ? '<p class="config-preview">Scope: Current Unit Source Row</p><p class="config-note">Uses the maximum occupied area across all available period columns for this Unit only.</p>'
+        : '')) +
     validationLine(hits)
   );
 }
@@ -213,8 +218,8 @@ function summaryEditor(column, context, rule, hits) {
       html += '<p class="config-preview">' + escapeHtml(describeRule(rule, context, columns, column.id)) + '</p>';
       html += '<p class="config-note">Each matched Unit is counted once. Property source area is not used.</p>';
     } else {
-      html += '<label>Source<select disabled><option>Property › ' + escapeHtml(column.label) + '</option></select></label></div>';
-      html += '<p class="config-preview">SUM(Property › ' + escapeHtml(column.label) + ')</p><p class="config-note">Adds the property-level value once per property. Unit rows are not included.</p>';
+      html += '<label>Source<select disabled><option>Property › ' + escapeHtml(column.id === 'cap_ex' ? 'General › Capital Costs' : column.label) + '</option></select></label></div>';
+      html += '<p class="config-preview">' + escapeHtml(column.id === 'cap_ex' ? describeRule(rule, context, columns, column.id) : ('SUM(Property › ' + column.label + ')')) + '</p><p class="config-note">Adds the property-level value once per property. Unit rows are not included.</p>';
     }
   } else if (kind === 'recalculate') {
     html += '<label>Operation<select data-edit="operation">';
@@ -285,7 +290,7 @@ function methodSelect(rule) {
   var options = [
     ['source', 'Source Field'],
     ['derived', 'Derived Calculation'],
-    ['aggregatedSource', 'Aggregated Source'],
+    ['aggregatedSource', rule && rule.sign === 'cost' ? 'Aggregated Source / Derived Aggregation' : 'Aggregated Source'],
     ['summary', 'Summary Aggregation'],
     ['fixed', 'Fixed Value'],
     ['blank', 'Blank'],
@@ -455,7 +460,8 @@ function renderConfiguration() {
   var issues = schemaIssues.concat(runtimeIssues);
   var tally = counts(draft.columns.filter(function (column) { return !isComparisonField(column); }), draft.contexts);
   var changes = changeCount(draft.columns, draft.contexts);
-  var columns = draft.columns.filter(function (column) { return !isComparisonField(column); });
+  var columns = draft.columns.filter(function (column) { return !isComparisonField(column) && column.role !== 'system'; });
+  var systemColumns = draft.columns.filter(function (column) { return column.role === 'system'; });
   var disabledColumns = draft.columns.filter(isComparisonField);
   var body = '';
   var shown = 0;
@@ -486,6 +492,13 @@ function renderConfiguration() {
       if (c === 0) {
         body += '<td class="config-field" rowspan="' + span + '">' + escapeHtml(displayLabel(column));
         if (column.format) body += '<span class="config-format">' + escapeHtml(column.format) + '</span>';
+        if (column.comparison && column.comparison.supported) {
+          body += '<span class="config-format">Comparison supported'
+            + (column.comparison.defaultEnabled ? ' · Default on' : '')
+            + (column.comparison.showPercentChange ? ' · Change %' : '')
+            + (column.comparison.propertyOnly ? ' · Property only' : '')
+            + '</span>';
+        }
         body += '</td>';
       }
       body += '<td>' + escapeHtml(contextLabel(context)) + '</td>';
@@ -510,6 +523,15 @@ function renderConfiguration() {
       var key = issue.columnId + '|' + issue.context;
       return '<li><button type="button" data-action="jump" data-key="' + escapeHtml(key) + '">' + escapeHtml(issue.label + ' · ' + contextLabel(issue.context) + ' — ' + issue.message) + '</button></li>';
     }).join('') + '</ul></div>';
+  }
+
+  var systemBody = '';
+  if (systemColumns.length) {
+    systemBody = '<section class="config-system"><h3>System Fields</h3><p>Always included and hidden in Excel. These references are not part of the report layout.</p><table class="config-table"><thead><tr><th>Output Field</th><th>Rule</th><th>Placement</th></tr></thead><tbody>' +
+      systemColumns.map(function (column) {
+        var rule = column.id === 'asset_unit_reference' ? 'Unit only. Address + "_" + Unit' : 'Unit only. Unit › General › Lease ID';
+        return '<tr><td>' + escapeHtml(column.label) + '</td><td>' + escapeHtml(rule) + '</td><td>Always included · Hidden in Excel</td></tr>';
+      }).join('') + '</tbody></table></section>';
   }
 
   var disabledBody = '';
@@ -545,6 +567,7 @@ function renderConfiguration() {
       return '<strong>' + escapeHtml(contextLabel(context)) + '</strong> ' + escapeHtml(text);
     }).join(' ') + '</p>' +
     issueList +
+    systemBody +
     '<div class="config-table-wrap"><table class="config-table"><thead><tr><th class="config-field">Output Field</th><th>Context</th><th>Value Method</th><th>Logic Definition</th><th>Status</th><th>Action</th></tr></thead><tbody>' +
     (body || '<tr><td colspan="6" class="config-empty">No fields match the current search or filter.</td></tr>') +
     '</tbody></table></div>' + disabledBody +

@@ -5,7 +5,7 @@
  */
 import { PROPERTY_SOURCE_FIELDS, UNIT_SOURCE_FIELDS } from '../schema/sourceFields.js';
 import { attachFieldLogic } from '../logic/attachFieldLogic.js';
-import { DEFAULT_FIELD_LOGIC } from '../logic/fieldRules.js';
+import { DEFAULT_FIELD_LOGIC, FIELD_COMPARISON } from '../logic/fieldRules.js';
 
 export { PROPERTY_UNIT_JOIN, PROPERTY_SECTOR } from '../schema/sourceFields.js';
 
@@ -18,12 +18,43 @@ export const WAULT_NUMBER_FORMAT = '0.00';
 
 const DEFAULT_SCHEDULE_COLUMN_DEFS = [
   {
+    id: "asset_unit_reference",
+    label: "Asset Unit Reference",
+    width: 28,
+    format: null,
+    wrap: false,
+    align: "center",
+    role: "system",
+    hiddenInExcel: true,
+    alwaysIncluded: true,
+    reorderable: false,
+    property: null,
+    unit: null,
+  },
+  {
+    id: "tenant_reference",
+    label: "Tenant Reference",
+    width: 16,
+    format: null,
+    wrap: false,
+    align: "center",
+    role: "system",
+    hiddenInExcel: true,
+    alwaysIncluded: true,
+    reorderable: false,
+    property: null,
+    unit: UNIT_SOURCE_FIELDS.leaseId,
+  },
+  {
     id: "property_reference",
     label: "Property Reference",
     width: 14,
     format: null,
     wrap: false,
     align: 'left',
+    role: 'required',
+    alwaysIncluded: true,
+    reorderable: false,
     property: PROPERTY_SOURCE_FIELDS.externalId,
     unit: null,
   },
@@ -33,7 +64,10 @@ const DEFAULT_SCHEDULE_COLUMN_DEFS = [
     width: 12,
     format: "mmm-yy",
     wrap: false,
-    align: 'right',
+    align: 'center',
+    role: 'required',
+    alwaysIncluded: true,
+    reorderable: false,
     property: PROPERTY_SOURCE_FIELDS.traditionalValuationDate,
     unit: null,
   },
@@ -43,7 +77,10 @@ const DEFAULT_SCHEDULE_COLUMN_DEFS = [
     width: 14,
     format: null,
     wrap: false,
-    align: 'left',
+    align: 'center',
+    role: 'required',
+    alwaysIncluded: true,
+    reorderable: false,
     property: PROPERTY_SOURCE_FIELDS.city,
     unit: null,
   },
@@ -54,6 +91,9 @@ const DEFAULT_SCHEDULE_COLUMN_DEFS = [
     format: null,
     wrap: true,
     align: 'left',
+    role: 'required',
+    alwaysIncluded: true,
+    reorderable: false,
     property: PROPERTY_SOURCE_FIELDS.propertyName,
     unit: null,
   },
@@ -291,11 +331,11 @@ const DEFAULT_SCHEDULE_COLUMN_DEFS = [
     id: "cap_ex",
     label: "Cap Ex",
     width: 12,
-    format: "£#,##0;[Red]-£#,##0",
+    format: "£#,##0;-£#,##0",
     wrap: false,
     align: 'right',
-    property: null,
-    unit: null,
+    property: PROPERTY_SOURCE_FIELDS.capitalCosts,
+    unit: UNIT_SOURCE_FIELDS.capitalCost,
   },
   {
     id: "fair_value",
@@ -355,7 +395,17 @@ const DEFAULT_SCHEDULE_COLUMN_DEFS = [
   },
 ];
 
-export const DEFAULT_SCHEDULE_COLUMNS = attachFieldLogic(DEFAULT_SCHEDULE_COLUMN_DEFS, DEFAULT_FIELD_LOGIC);
+function withReportRole(column) {
+  var next = column.role || column.rendered === false ? column : Object.assign({}, column, { role: 'optional', reorderable: true });
+  var comparison = FIELD_COMPARISON[column.id];
+  if (!comparison || column.rendered === false || column.feature === 'comparison') return next;
+  return Object.assign({}, next, { comparison: comparison });
+}
+
+export const DEFAULT_SCHEDULE_COLUMNS = attachFieldLogic(
+  DEFAULT_SCHEDULE_COLUMN_DEFS.map(withReportRole),
+  DEFAULT_FIELD_LOGIC
+);
 
 export function isRenderedScheduleColumn(column) {
   return !column || column.rendered !== false;

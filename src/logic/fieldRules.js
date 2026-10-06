@@ -4,8 +4,10 @@ function source(ref) {
   return { method: 'source', ref: ref };
 }
 
-function aggregated(ref) {
-  return { method: 'aggregatedSource', ref: ref };
+function aggregated(ref, sign) {
+  var rule = { method: 'aggregatedSource', ref: ref };
+  if (sign) rule.sign = sign;
+  return rule;
 }
 
 function blank() {
@@ -99,6 +101,8 @@ export function waultBreakRule(scopeNote) {
 var blankRow = contexts(blank(), blank(), blank(), blank());
 
 export const DEFAULT_FIELD_LOGIC = {
+  asset_unit_reference: contexts(blank(), { method: 'derived', calculation: 'assetUnitReference' }, blank(), blank()),
+  tenant_reference: contexts(blank(), source(UNIT_SOURCE_FIELDS.leaseId), blank(), blank()),
   property_reference: contexts(source(PROPERTY_SOURCE_FIELDS.externalId), blank(), sectorLabel(), grandLabel()),
   valuation: contexts(source(PROPERTY_SOURCE_FIELDS.traditionalValuationDate), blank(), blank(), blank()),
   town: contexts(source(PROPERTY_SOURCE_FIELDS.city), blank(), blank(), blank()),
@@ -161,12 +165,51 @@ export const DEFAULT_FIELD_LOGIC = {
     recalculate('fair_value', 'area_sqft'),
     recalculate('fair_value', 'area_sqft')
   ),
-  cap_ex: contexts(blank(), blank(), sum(), sum()),
+  cap_ex: contexts(
+    source(PROPERTY_SOURCE_FIELDS.capitalCosts),
+    aggregated(UNIT_SOURCE_FIELDS.capitalCost, 'cost'),
+    sum(),
+    sum()
+  ),
   fair_value: contexts(source(PROPERTY_SOURCE_FIELDS.sayValue), blank(), sum(), sum()),
   fair_value_march_2026: blankRow,
   pct_change_26_april_24: blankRow,
   pct_change_x_ytd: blankRow,
   comments: blankRow,
+};
+
+function comparisonMeta(defaultEnabled, showPercentChange, propertyOnly) {
+  return {
+    supported: true,
+    defaultEnabled: !!defaultEnabled,
+    showPercentChange: !!showPercentChange,
+    propertyOnly: !!propertyOnly,
+  };
+}
+
+/** Shared comparison eligibility. Report Fields and the exporter both read this. */
+export const FIELD_COMPARISON = {
+  tenure_uk: comparisonMeta(false, false, false),
+  area_sqft: comparisonMeta(false, false, false),
+  tenant_name: comparisonMeta(false, false, false),
+  start_date: comparisonMeta(false, false, false),
+  review_date: comparisonMeta(false, false, false),
+  expiry_date: comparisonMeta(false, false, false),
+  break_date: comparisonMeta(false, false, false),
+  mwault_year: comparisonMeta(false, false, false),
+  contracted_rent_pa: comparisonMeta(false, false, false),
+  contracted_rent_psf: comparisonMeta(false, false, false),
+  deemed_rent_psf: comparisonMeta(false, false, false),
+  market_rent_pa: comparisonMeta(false, false, false),
+  market_rent_psf: comparisonMeta(false, false, false),
+  current_void: comparisonMeta(false, false, false),
+  rent_free_month: comparisonMeta(false, false, false),
+  cap_rate: comparisonMeta(false, false, false),
+  niy: comparisonMeta(false, false, false),
+  ney: comparisonMeta(false, false, false),
+  ry: comparisonMeta(false, false, false),
+  cv_psf: comparisonMeta(false, false, false),
+  fair_value: comparisonMeta(true, true, true),
 };
 
 export const DEFAULT_LOGIC_CONTEXTS = ['property', 'unit', 'sectorTotal', 'grandTotal'];

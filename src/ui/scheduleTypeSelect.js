@@ -5,6 +5,7 @@ import {
 } from '../config/scheduleTypes.js';
 import { APP_STATE } from '../state.js';
 import { escapeHtml } from './common.js';
+import { refreshReportFieldsAvailability } from '../standardiser/reportFields.js';
 
 var open = false;
 var highlightIndex = -1;
@@ -36,6 +37,7 @@ function applyScheduleType(type) {
   var els = getEls();
   if (els.triggerLabel) els.triggerLabel.textContent = type.label;
   if (els.blurb) els.blurb.textContent = type.description;
+  refreshReportFieldsAvailability();
   if (els.trigger) els.trigger.setAttribute('aria-label', 'Schedule type, ' + type.label);
   renderMenu();
 }

@@ -4,13 +4,23 @@ import { buildPortfolio } from '../model/portfolio.js';
 import { UNIT_SOURCE_FIELDS } from '../schema/sourceFields.js';
 import {
   DEFAULT_SCHEDULE_COLUMNS,
-  getRenderedScheduleColumns,
   PROPERTY_SECTOR,
   UNCLASSIFIED_SECTOR,
 } from '../templates/defaultSchedule.js';
+import { buildOutputColumns } from '../logic/reportLayout.js';
 import { DEFAULT_SCHEDULE_STRUCTURE } from '../logic/scheduleStructure.js';
 import { applyPropertyContext, summaryValues } from '../logic/summaries.js';
-import { MULTIPLE_VALUATION_DATES_WARNING, resolvePortfolioValuation } from '../logic/fairValue.js';
+import {
+  MULTIPLE_PREVIOUS_VALUATION_DATES_WARNING,
+  MULTIPLE_VALUATION_DATES_WARNING,
+  resolvePortfolioValuation,
+} from '../logic/fairValue.js';
+import {
+  attachPreviousMatches,
+  indexPreviousPortfolio,
+  overlaySummaryComparison,
+  withRowComparison,
+} from '../logic/comparison.js';
 
 function sectorNameFor(property, propertyData) {
   var raw = readSourceValue(property.sourceRow, propertyData.columns, 'property', PROPERTY_SECTOR);
@@ -57,11 +67,31 @@ export function findDiagnosticFieldValue(parsedRow, sourceColumns, fieldNames) {
   return raw;
 }
 
-export function getActiveOutputColumns(headingById) {
-  return getRenderedScheduleColumns(headingById);
+function referenceText(value) {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/\u00a0/g, ' ').trim();
 }
 
-export function transformToSchedule(propertyData, unitData) {
+export function assetUnitReference(address, unitName) {
+  var left = referenceText(address);
+  var right = referenceText(unitName);
+  if (left && right) return left + '_' + right;
+  return left || right || null;
+}
+
+export function getActiveOutputColumns(headingById, options) {
+  return buildOutputColumns(headingById, options);
+}
+
+function matchedPreviousProperties(properties) {
+  var matched = [];
+  for (var i = 0; i < properties.length; i += 1) {
+    if (properties[i].previousProperty) matched.push(properties[i].previousProperty);
+  }
+  return matched;
+}
+
+export function transformToSchedule(propertyData, unitData, options) {
   var errors = [];
   var warnings = [];
   var columns = getActiveOutputColumns();
@@ -123,6 +153,25 @@ export function transformToSchedule(propertyData, unitData) {
     );
   }
 
+  var previousProperty = options && options.previousProperty;
+  var previousUnit = options && options.previousUnit;
+  var previousValuation = { period: '', consistent: true };
+  if (previousProperty) {
+    var previousPortfolio = buildPortfolio(previousProperty, previousUnit || { rows: [], columns: [] });
+    for (var pp = 0; pp < previousPortfolio.properties.length; pp += 1) {
+      applyPropertyContext(previousPortfolio.properties[pp], DEFAULT_SCHEDULE_COLUMNS);
+    }
+    var previousIndex = indexPreviousPortfolio(previousPortfolio);
+    if (previousIndex.duplicatePropertyRefs.length) {
+      warnings.push('Duplicate previous Property Reference values were ignored for comparison.');
+    }
+    previousValuation = resolvePortfolioValuation(previousPortfolio.properties.map(function (property) {
+      return property.standardValues && property.standardValues.valuation;
+    }));
+    if (!previousValuation.consistent) warnings.push(MULTIPLE_PREVIOUS_VALUATION_DATES_WARNING);
+    attachPreviousMatches(portfolio.properties, previousIndex);
+  }
+
   var grouped = groupPropertiesBySector(portfolio.properties, propertyData);
   var scheduleRows = [];
   var allProperties = [];
@@ -143,16 +192,20 @@ export function transformToSchedule(propertyData, unitData) {
           scheduleRows.push({
             kind: 'property',
             sector: sector,
-            values: property.standardValues,
+            values: withRowComparison('property', property.standardValues, property.previousProperty),
             sourceRowIndex: property.sourceRow.rowIndex,
             matchKey: property.matchKey,
           });
           for (var u = 0; u < property.units.length; u += 1) {
             var unit = property.units[u];
+            unit.standardValues.asset_unit_reference = assetUnitReference(
+              property.standardValues && property.standardValues.address,
+              unit.standardValues && unit.standardValues.unit
+            );
             scheduleRows.push({
               kind: 'unit',
               sector: sector,
-              values: unit.standardValues,
+              values: withRowComparison('unit', unit.standardValues, unit.previousUnit),
               sourceRowIndex: unit.sourceRow.rowIndex,
               matchKey: unit.matchKey,
             });
@@ -162,7 +215,13 @@ export function transformToSchedule(propertyData, unitData) {
         scheduleRows.push({
           kind: 'sectorTotal',
           sector: sector,
-          values: summaryValues(sectorProperties, DEFAULT_SCHEDULE_COLUMNS, 'sectorTotal', sector),
+          values: overlaySummaryComparison(
+            summaryValues(sectorProperties, DEFAULT_SCHEDULE_COLUMNS, 'sectorTotal', sector),
+            (function () {
+              var matched = matchedPreviousProperties(sectorProperties);
+              return matched.length ? summaryValues(matched, DEFAULT_SCHEDULE_COLUMNS, 'sectorTotal', sector) : null;
+            })()
+          ),
         });
       } else if (token === 'separator') {
         scheduleRows.push({ kind: 'separator', values: {} });
@@ -173,7 +232,13 @@ export function transformToSchedule(propertyData, unitData) {
     if (DEFAULT_SCHEDULE_STRUCTURE.afterSectors[close] === 'grandTotal') {
       scheduleRows.push({
         kind: 'grandTotal',
-        values: summaryValues(allProperties, DEFAULT_SCHEDULE_COLUMNS, 'grandTotal', null),
+        values: overlaySummaryComparison(
+          summaryValues(allProperties, DEFAULT_SCHEDULE_COLUMNS, 'grandTotal', null),
+          (function () {
+            var matched = matchedPreviousProperties(allProperties);
+            return matched.length ? summaryValues(matched, DEFAULT_SCHEDULE_COLUMNS, 'grandTotal', null) : null;
+          })()
+        ),
       });
     }
   }
@@ -207,7 +272,13 @@ export function transformToSchedule(propertyData, unitData) {
     })
   );
   if (!valuation.consistent) warnings.push(MULTIPLE_VALUATION_DATES_WARNING);
-  columns = getActiveOutputColumns({ fair_value: valuation.heading });
+  columns = getActiveOutputColumns({ fair_value: valuation.heading }, {
+    previousProperty: !!previousProperty,
+    previousUnit: !!previousUnit,
+    currentPeriod: valuation.period || '',
+    previousPeriod: previousValuation.period || '',
+    previousDatesDiffer: !!(previousProperty && !previousValuation.consistent),
+  });
 
   return {
     ok: true,

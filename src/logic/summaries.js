@@ -81,6 +81,7 @@ export function evaluateRule(rule, properties, columnId, sectorName) {
       sumProperties(properties, rule.denominator.id)
     );
   }
+  if (rule.method === 'derived' && rule.calculation === 'assetUnitReference') return null;
   if (rule.method === 'derived' && rule.calculation === 'divide') {
     return divideValues(
       sumProperties(properties, rule.numerator.id),
@@ -102,6 +103,7 @@ export function applyPropertyDerived(property, columns) {
     var column = columns[i];
     var rule = column.logic && column.logic.property;
     if (!rule || rule.method !== 'derived') continue;
+    if (rule.calculation === 'assetUnitReference') continue;
     if (rule.calculation === 'divide') {
       values[column.id] = divideValues(numeric(values[rule.numerator.id]), numeric(values[rule.denominator.id]));
       continue;
