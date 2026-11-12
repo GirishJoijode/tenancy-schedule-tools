@@ -2,6 +2,7 @@ import { getLogicTemplate } from './registry.js';
 import { cloneDefinition } from './draftState.js';
 import { validateTemplateLogic } from './validateLogic.js';
 import { DEFAULT_SCHEDULE_STRUCTURE } from './scheduleStructure.js';
+import { breakdownSpecification } from './portfolioBreakdown.js';
 
 var APPLICATION_VERSION = '1.0.0';
 
@@ -135,6 +136,7 @@ export function buildDraftSpecification(templateId, draft) {
       },
       logicIndex: logicIndex(draft.columns, contexts),
       scheduleStructure: production.id === 'tenancy_schedule' ? cloneDefinition(DEFAULT_SCHEDULE_STRUCTURE) : null,
+      portfolioBreakdown: production.id === 'tenancy_schedule' ? breakdownSpecification() : null,
       developerNotes:
         'Draft only. Production generation reads the source-controlled template. Apply accepted changes in source code. This file contains logic metadata and no workbook business data.',
     },

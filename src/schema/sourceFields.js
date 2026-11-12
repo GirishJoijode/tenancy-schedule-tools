@@ -17,6 +17,7 @@ export const PROPERTY_SOURCE_FIELDS = {
   externalId: sourceField('General', 'External ID'),
   propertyName: sourceField('General', 'Property Name'),
   sector: sourceField('General', 'Sector'),
+  regionCountry: sourceField('General', 'Region / Country'),
   traditionalValuationDate: sourceField('General', 'Traditional Valuation Date'),
   city: sourceField('General', 'City'),
   contractedRent: sourceField('General', 'Contracted Rent'),

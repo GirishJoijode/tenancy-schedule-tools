@@ -2,14 +2,11 @@ import { normaliseHeader } from '../schema/text.js';
 import { findSourceColumn, readSourceValue } from '../schema/sourceLookup.js';
 import { buildPortfolio } from '../model/portfolio.js';
 import { UNIT_SOURCE_FIELDS } from '../schema/sourceFields.js';
-import {
-  DEFAULT_SCHEDULE_COLUMNS,
-  PROPERTY_SECTOR,
-  UNCLASSIFIED_SECTOR,
-} from '../templates/defaultSchedule.js';
+import { buildPortfolioGroups, getBreakdownMode, getCustomConfig } from '../logic/portfolioBreakdown.js';
+import { DEFAULT_SCHEDULE_COLUMNS } from '../templates/defaultSchedule.js';
 import { buildOutputColumns } from '../logic/reportLayout.js';
 import { DEFAULT_SCHEDULE_STRUCTURE } from '../logic/scheduleStructure.js';
-import { applyPropertyContext, summaryValues } from '../logic/summaries.js';
+import { applyPropertyContext, calculateGroupTotals, summaryValues } from '../logic/summaries.js';
 import {
   MULTIPLE_PREVIOUS_VALUATION_DATES_WARNING,
   MULTIPLE_VALUATION_DATES_WARNING,
@@ -21,28 +18,6 @@ import {
   overlaySummaryComparison,
   withRowComparison,
 } from '../logic/comparison.js';
-
-function sectorNameFor(property, propertyData) {
-  var raw = readSourceValue(property.sourceRow, propertyData.columns, 'property', PROPERTY_SECTOR);
-  if (raw === null || raw === undefined) return UNCLASSIFIED_SECTOR;
-  var text = String(raw).replace(/\u00a0/g, ' ').trim();
-  return text || UNCLASSIFIED_SECTOR;
-}
-
-function groupPropertiesBySector(properties, propertyData) {
-  var order = [];
-  var groups = new Map();
-  for (var i = 0; i < properties.length; i += 1) {
-    var property = properties[i];
-    var sector = sectorNameFor(property, propertyData);
-    if (!groups.has(sector)) {
-      groups.set(sector, []);
-      order.push(sector);
-    }
-    groups.get(sector).push(property);
-  }
-  return { order: order, groups: groups };
-}
 
 export function findDiagnosticFieldValue(parsedRow, sourceColumns, fieldNames) {
   var wanted = fieldNames.map(function (field) {
@@ -172,74 +147,102 @@ export function transformToSchedule(propertyData, unitData, options) {
     attachPreviousMatches(portfolio.properties, previousIndex);
   }
 
-  var grouped = groupPropertiesBySector(portfolio.properties, propertyData);
+  var requested = options && options.breakdown;
+  var grouped = buildPortfolioGroups(portfolio.properties, {
+    mode: requested && requested.mode ? requested.mode : getBreakdownMode(),
+    propertyData: propertyData,
+    customConfig: requested && requested.customConfig ? requested.customConfig : getCustomConfig(),
+  });
   var scheduleRows = [];
   var allProperties = [];
-  for (var s = 0; s < grouped.order.length; s += 1) {
-    var sector = grouped.order[s];
-    var sectorProperties = grouped.groups.get(sector);
-    for (var prep = 0; prep < sectorProperties.length; prep += 1) {
-      applyPropertyContext(sectorProperties[prep], DEFAULT_SCHEDULE_COLUMNS);
-      allProperties.push(sectorProperties[prep]);
+
+  function remember(properties) {
+    for (var prep = 0; prep < properties.length; prep += 1) {
+      applyPropertyContext(properties[prep], DEFAULT_SCHEDULE_COLUMNS);
+      allProperties.push(properties[prep]);
     }
-    for (var step = 0; step < DEFAULT_SCHEDULE_STRUCTURE.perSector.length; step += 1) {
-      var token = DEFAULT_SCHEDULE_STRUCTURE.perSector[step];
-      if (token === 'sectorHeader') {
-        scheduleRows.push({ kind: 'sector', sector: sector, values: {} });
-      } else if (token === 'properties') {
-        for (var i = 0; i < sectorProperties.length; i += 1) {
-          var property = sectorProperties[i];
-          scheduleRows.push({
-            kind: 'property',
-            sector: sector,
-            values: withRowComparison('property', property.standardValues, property.previousProperty),
-            sourceRowIndex: property.sourceRow.rowIndex,
-            matchKey: property.matchKey,
-          });
-          for (var u = 0; u < property.units.length; u += 1) {
-            var unit = property.units[u];
-            unit.standardValues.asset_unit_reference = assetUnitReference(
-              property.standardValues && property.standardValues.address,
-              unit.standardValues && unit.standardValues.unit
-            );
-            scheduleRows.push({
-              kind: 'unit',
-              sector: sector,
-              values: withRowComparison('unit', unit.standardValues, unit.previousUnit),
-              sourceRowIndex: unit.sourceRow.rowIndex,
-              matchKey: unit.matchKey,
-            });
-          }
-        }
-      } else if (token === 'sectorTotal') {
+  }
+
+  function appendProperties(properties, groupLabel) {
+    for (var i = 0; i < properties.length; i += 1) {
+      var property = properties[i];
+      scheduleRows.push({
+        kind: 'property',
+        group: groupLabel,
+        sector: groupLabel,
+        values: withRowComparison('property', property.standardValues, property.previousProperty),
+        sourceRowIndex: property.sourceRow.rowIndex,
+        matchKey: property.matchKey,
+      });
+      for (var u = 0; u < property.units.length; u += 1) {
+        var unit = property.units[u];
+        unit.standardValues.asset_unit_reference = assetUnitReference(
+          property.standardValues && property.standardValues.address,
+          unit.standardValues && unit.standardValues.unit
+        );
         scheduleRows.push({
-          kind: 'sectorTotal',
-          sector: sector,
-          values: overlaySummaryComparison(
-            summaryValues(sectorProperties, DEFAULT_SCHEDULE_COLUMNS, 'sectorTotal', sector),
-            (function () {
-              var matched = matchedPreviousProperties(sectorProperties);
-              return matched.length ? summaryValues(matched, DEFAULT_SCHEDULE_COLUMNS, 'sectorTotal', sector) : null;
-            })()
-          ),
+          kind: 'unit',
+          group: groupLabel,
+          sector: groupLabel,
+          values: withRowComparison('unit', unit.standardValues, unit.previousUnit),
+          sourceRowIndex: unit.sourceRow.rowIndex,
+          matchKey: unit.matchKey,
         });
-      } else if (token === 'separator') {
-        scheduleRows.push({ kind: 'separator', values: {} });
       }
     }
   }
-  for (var close = 0; close < DEFAULT_SCHEDULE_STRUCTURE.afterSectors.length; close += 1) {
-    if (DEFAULT_SCHEDULE_STRUCTURE.afterSectors[close] === 'grandTotal') {
-      scheduleRows.push({
-        kind: 'grandTotal',
-        values: overlaySummaryComparison(
-          summaryValues(allProperties, DEFAULT_SCHEDULE_COLUMNS, 'grandTotal', null),
-          (function () {
-            var matched = matchedPreviousProperties(allProperties);
-            return matched.length ? summaryValues(matched, DEFAULT_SCHEDULE_COLUMNS, 'grandTotal', null) : null;
-          })()
-        ),
-      });
+
+  function appendGrandTotal() {
+    scheduleRows.push({
+      kind: 'grandTotal',
+      values: overlaySummaryComparison(
+        summaryValues(allProperties, DEFAULT_SCHEDULE_COLUMNS, 'grandTotal', null),
+        (function () {
+          var matched = matchedPreviousProperties(allProperties);
+          return matched.length ? summaryValues(matched, DEFAULT_SCHEDULE_COLUMNS, 'grandTotal', null) : null;
+        })()
+      ),
+    });
+  }
+
+  if (!grouped.effective) {
+    remember(grouped.properties);
+    for (var plain = 0; plain < DEFAULT_SCHEDULE_STRUCTURE.ungrouped.length; plain += 1) {
+      var plainToken = DEFAULT_SCHEDULE_STRUCTURE.ungrouped[plain];
+      if (plainToken === 'properties') appendProperties(grouped.properties, '');
+      else if (plainToken === 'separator') scheduleRows.push({ kind: 'separator', values: {} });
+      else if (plainToken === 'grandTotal') appendGrandTotal();
+    }
+  } else {
+    for (var s = 0; s < grouped.groups.length; s += 1) {
+      var group = grouped.groups[s];
+      remember(group.properties);
+      for (var step = 0; step < DEFAULT_SCHEDULE_STRUCTURE.perGroup.length; step += 1) {
+        var token = DEFAULT_SCHEDULE_STRUCTURE.perGroup[step];
+        if (token === 'groupHeader') {
+          scheduleRows.push({ kind: 'group', group: group.label, sector: group.label, values: {} });
+        } else if (token === 'properties') {
+          appendProperties(group.properties, group.label);
+        } else if (token === 'groupTotal') {
+          scheduleRows.push({
+            kind: 'groupTotal',
+            group: group.label,
+            sector: group.label,
+            values: overlaySummaryComparison(
+              calculateGroupTotals(group.properties, DEFAULT_SCHEDULE_COLUMNS, group.label),
+              (function (members, label) {
+                var matched = matchedPreviousProperties(members);
+                return matched.length ? calculateGroupTotals(matched, DEFAULT_SCHEDULE_COLUMNS, label) : null;
+              })(group.properties, group.label)
+            ),
+          });
+        } else if (token === 'separator') {
+          scheduleRows.push({ kind: 'separator', values: {} });
+        }
+      }
+    }
+    for (var close = 0; close < DEFAULT_SCHEDULE_STRUCTURE.afterGroups.length; close += 1) {
+      if (DEFAULT_SCHEDULE_STRUCTURE.afterGroups[close] === 'grandTotal') appendGrandTotal();
     }
   }
 

@@ -4,6 +4,7 @@ import { readSourceValue } from '../schema/sourceLookup.js';
 import { PROPERTY_SOURCE_FIELDS } from '../schema/sourceFields.js';
 import { APP_STATE } from '../state.js';
 import { escapeHtml, formatCount, qs, setStatusLines } from '../ui/common.js';
+import { syncPortfolioBreakdownToProperty } from '../ui/portfolioBreakdown.js';
 import { generateStandardisedSchedule } from './generator.js';
 import { analyseMatching } from './transform.js';
 
@@ -85,6 +86,7 @@ export function setupDropzone(dropzone) {
     parseSourceFile(file, fileType)
       .then(function (parsed) {
         APP_STATE[stateKey] = parsed;
+        if (stateKey === 'property') syncPortfolioBreakdownToProperty(parsed);
 
         showSuccess(parsed);
         clearGenerateResult();
@@ -92,6 +94,7 @@ export function setupDropzone(dropzone) {
       })
       .catch(function (err) {
         APP_STATE[stateKey] = null;
+        if (stateKey === 'property') syncPortfolioBreakdownToProperty(null);
         var message =
           err && typeof err.message === 'string' && err.message
             ? err.message
@@ -122,6 +125,7 @@ export function setupDropzone(dropzone) {
     removeBtn.addEventListener('click', function (event) {
       event.stopPropagation();
       APP_STATE[stateKey] = null;
+      if (stateKey === 'property') syncPortfolioBreakdownToProperty(null);
       if (input) input.value = '';
       showIdle();
       clearGenerateResult();

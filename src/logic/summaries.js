@@ -133,4 +133,9 @@ export function summaryValues(properties, columns, context, sectorName) {
   return values;
 }
 
+/** Group totals reuse the shared group-total rules. The grouping engine only chooses membership. */
+export function calculateGroupTotals(properties, columns, groupLabel) {
+  return summaryValues(properties, columns, 'sectorTotal', groupLabel);
+}
+
 export { resolveBreakEnd };

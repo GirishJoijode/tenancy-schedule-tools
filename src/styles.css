@@ -790,6 +790,98 @@ html.report-dragging, html.report-dragging * { cursor: grabbing !important; }
   color: var(--text-muted);
 }
 
+.breakdown-field { width: auto; }
+.breakdown-line { display: flex; align-items: center; gap: 8px; }
+.breakdown-field .schedule-type-select { width: 240px; }
+.breakdown-field.is-disabled { opacity: 0.55; }
+.breakdown-edit {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--navy);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.breakdown-edit:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.breakdown-note {
+  margin: 8px 0 0 352px;
+  max-width: 460px;
+  font-size: 0.75rem;
+  line-height: 1.35;
+  color: #6e5a2c;
+}
+.group-dialog { width: min(1000px, calc(100vw - 48px)); }
+.group-toolbar { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 12px; }
+.group-search { flex: 1; display: flex; flex-direction: column; gap: 4px; font-size: 0.75rem; color: var(--text-muted); }
+.group-search input, .group-name, .group-move select {
+  height: 34px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  padding: 0 10px;
+  color: var(--navy);
+  background: #fff;
+  font: inherit;
+  font-size: 0.85rem;
+}
+.group-add, .group-card-head button {
+  height: 34px;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--navy);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0 10px;
+  cursor: pointer;
+}
+.group-add:hover, .group-card-head button:hover:not(:disabled) { border-color: var(--navy); }
+.group-move { display: flex; flex-direction: column; gap: 4px; font-size: 0.75rem; color: var(--text-muted); }
+.group-panels { display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 12px; min-height: 0; flex: 1; }
+.group-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  background: var(--bg);
+}
+.group-panel header { padding: 10px 12px 8px; }
+.group-panel h3 { margin: 0; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--navy); }
+.group-panel header p { margin: 4px 0 0; font-size: 0.75rem; color: var(--text-muted); }
+.group-scroll, .group-panel > .group-list { overflow: auto; max-height: 420px; padding: 0 8px 8px; }
+.group-card { margin: 0 0 8px; background: #fff; border: 1px solid #d6dee8; border-radius: 6px; }
+.group-card.is-selected, .group-card.is-drop-active, .group-list.is-drop-active { border-color: var(--navy); }
+.group-card-head { display: flex; align-items: center; gap: 6px; padding: 8px; }
+.group-name { flex: 1; min-width: 0; }
+.group-handle { color: #8b90a0; cursor: grab; background: transparent; border: 0; padding: 0 2px; }
+.group-list { list-style: none; margin: 0; padding: 0 8px 8px; min-height: 36px; }
+.group-property {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  margin: 0 0 4px;
+  padding: 4px 8px;
+  background: #fff;
+  border: 1px solid #e3e8ef;
+  border-radius: 4px;
+  cursor: grab;
+}
+.group-property.is-selected { background: #eef1f6; border-color: #c5ceda; }
+.group-property.is-dragging, .group-handle.is-dragging { opacity: 0.65; box-shadow: 0 4px 10px rgba(37, 39, 58, 0.12); }
+.group-property-copy { display: flex; gap: 8px; min-width: 0; }
+.group-property-id { font-weight: 600; color: var(--navy); }
+.group-property-name { color: #3c4254; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.group-placeholder, .group-empty { margin: 8px; color: var(--text-muted); font-size: 0.8rem; }
+.group-issue { margin: 0 8px 6px; color: #8a3b2a; font-size: 0.75rem; }
+
 .upload-grid.upload-grid-single {
   grid-template-columns: 1fr;
 }
@@ -1433,9 +1525,11 @@ html.report-dragging, html.report-dragging * { cursor: grabbing !important; }
     grid-template-columns: 1fr;
   }
 
-  .schedule-type-select {
+  .schedule-type-select,
+  .breakdown-field .schedule-type-select {
     width: 100%;
   }
+  .breakdown-note { margin-left: 0; }
 
   .app-tools-nav {
     width: 100%;

@@ -243,23 +243,35 @@ var SCHEDULE_HEADER_BORDER = {
   right: { style: 'thin', color: SCHEDULE_BLACK },
 };
 
-var SCHEDULE_SECTOR_EDGE = { style: 'medium', color: SCHEDULE_BLACK };
+var SCHEDULE_GROUP_EDGE = { style: 'medium', color: SCHEDULE_BLACK };
 
-function sectorBandBorder(columnIndex, firstVisible, lastIndex) {
+function groupBandBorder(columnIndex, firstVisible, lastIndex) {
   var border = {
-    top: SCHEDULE_SECTOR_EDGE,
-    bottom: SCHEDULE_SECTOR_EDGE,
+    top: SCHEDULE_GROUP_EDGE,
+    bottom: SCHEDULE_GROUP_EDGE,
   };
-  if (columnIndex === firstVisible) border.left = SCHEDULE_SECTOR_EDGE;
-  if (columnIndex === lastIndex) border.right = SCHEDULE_SECTOR_EDGE;
+  if (columnIndex === firstVisible) border.left = SCHEDULE_GROUP_EDGE;
+  if (columnIndex === lastIndex) border.right = SCHEDULE_GROUP_EDGE;
   return border;
+}
+
+function isGroupHeader(row) {
+  return row.kind === 'group' || row.kind === 'sector';
+}
+
+function isGroupTotal(row) {
+  return row.kind === 'groupTotal' || row.kind === 'sectorTotal';
+}
+
+function groupLabel(row) {
+  return row.group || row.sector || '';
 }
 
 function summaryBandStyle(columnIndex, firstVisible, lastIndex, horizontal, indent) {
   return {
     fill: HEADER_FILL,
     font: SCHEDULE_HEADER_FONT,
-    border: sectorBandBorder(columnIndex, firstVisible, lastIndex),
+    border: groupBandBorder(columnIndex, firstVisible, lastIndex),
     alignment: {
       vertical: 'center',
       horizontal: horizontal,
@@ -354,7 +366,7 @@ export function buildTenancyScheduleSheet(model) {
     var row = scheduleRows[r];
     var excelRow = r + 2;
 
-    if (row.kind === 'sector') {
+    if (isGroupHeader(row)) {
       merges.push({
         s: { r: excelRow, c: firstVisible },
         e: { r: excelRow, c: lastIndex },
@@ -367,7 +379,7 @@ export function buildTenancyScheduleSheet(model) {
         }
         ws[sectorAddr] = {
           t: 's',
-          v: sc === firstVisible ? row.sector : '',
+          v: sc === firstVisible ? groupLabel(row) : '',
           s: summaryBandStyle(sc, firstVisible, lastIndex, 'left', sc === firstVisible ? 1 : 0),
         };
       }
@@ -388,7 +400,7 @@ export function buildTenancyScheduleSheet(model) {
       continue;
     }
 
-    if (row.kind === 'sectorTotal' || row.kind === 'grandTotal') {
+    if (isGroupTotal(row) || row.kind === 'grandTotal') {
       for (var tc = 0; tc < colCount; tc += 1) {
         var totalId = columns[tc].id;
         var totalValue = row.values[totalId];

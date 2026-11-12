@@ -151,23 +151,23 @@ try {
   const model = transformToSchedule(propertyParsed, unitParsed);
   assert(model.ok, 'default transform failed');
   const outline = model.scheduleRows.map(function (row) {
-    if (row.kind === 'sector') return 'sector:' + row.sector;
-    if (row.kind === 'sectorTotal') return 'sectorTotal:' + row.values.property_reference;
+    if (row.kind === 'group') return 'group:' + row.group;
+    if (row.kind === 'groupTotal') return 'groupTotal:' + row.values.property_reference;
     if (row.kind === 'separator') return 'separator';
     if (row.kind === 'grandTotal') return 'grandTotal:' + row.values.property_reference;
     return row.kind + ':' + (row.values.property_reference || row.values.unit || '');
   });
   const expectedOutline = [
-    'sector:Healthcare', 'property:ASSET-1', 'unit:1', 'unit:2', 'unit:3',
-    'property:ASSET-2', 'property:ASSET-4', 'sectorTotal:Healthcare TOTAL', 'separator',
-    'sector:Offices', 'property:ASSET-3', 'unit:G', 'sectorTotal:Offices TOTAL', 'separator',
-    'sector:Unclassified', 'property:ASSET-5', 'sectorTotal:Unclassified TOTAL', 'separator',
-    'sector:Retail Warehouse', 'property:ASSET-6', 'sectorTotal:Retail Warehouse TOTAL', 'separator',
+    'group:Healthcare', 'property:ASSET-1', 'unit:1', 'unit:2', 'unit:3',
+    'property:ASSET-2', 'property:ASSET-4', 'groupTotal:Healthcare TOTAL', 'separator',
+    'group:Offices', 'property:ASSET-3', 'unit:G', 'groupTotal:Offices TOTAL', 'separator',
+    'group:Retail Warehouse', 'property:ASSET-6', 'groupTotal:Retail Warehouse TOTAL', 'separator',
+    'group:Unclassified', 'property:ASSET-5', 'groupTotal:Unclassified TOTAL', 'separator',
     'grandTotal:GRAND TOTAL',
   ];
   assert(JSON.stringify(outline) === JSON.stringify(expectedOutline), 'sector outline\n' + outline.join(' | '));
-  const sectorTotals = model.scheduleRows.filter(function (row) { return row.kind === 'sectorTotal'; });
-  const sectors = model.scheduleRows.filter(function (row) { return row.kind === 'sector'; });
+  const sectorTotals = model.scheduleRows.filter(function (row) { return row.kind === 'groupTotal'; });
+  const sectors = model.scheduleRows.filter(function (row) { return row.kind === 'group'; });
   assert(sectorTotals.length === sectors.length, 'each sector needs one total');
   assert(model.scheduleRows.filter(function (row) { return row.kind === 'separator'; }).length === sectors.length, 'separator after each sector');
   assert(model.scheduleRows[model.scheduleRows.length - 2].kind === 'separator', 'separator before grand total');
@@ -175,7 +175,7 @@ try {
   const healthcareTotal = sectorTotals[0];
   assert(healthcareTotal.values.niy == null && healthcareTotal.values.mwault_year == null, 'yield and empty WAULT stay blank');
   assert(model.unmatchedRows.length === 1, 'orphan unit was not reported');
-  assert(model.scheduleRows.every(function (row) { return row.kind === 'sector' || row.values.address !== 'Orphan House'; }), 'orphan entered the schedule');
+  assert(model.scheduleRows.every(function (row) { return row.kind === 'group' || row.values.address !== 'Orphan House'; }), 'orphan entered the schedule');
 
   const book = buildWorkbookFromModel(model);
   const sheet = book.Sheets['Tenancy Schedule'];
@@ -306,26 +306,24 @@ try {
   assert(totalModel.ok, 'total model failed');
   const asset1 = totalModel.scheduleRows.find(function (row) { return row.kind === 'property' && row.values.property_reference === 'ASSET-1'; });
   const asset1Break = totalModel.scheduleRows.find(function (row) { return row.kind === 'unit' && row.values.unit === 'A'; });
-  const healthcare = totalModel.scheduleRows.find(function (row) { return row.kind === 'sectorTotal'; });
   const grand = totalModel.scheduleRows.find(function (row) { return row.kind === 'grandTotal'; });
+  assert(!totalModel.scheduleRows.some(function (row) { return row.kind === 'group' || row.kind === 'groupTotal'; }), 'single sector portfolio omits group sections');
   assert(closeNumber(asset1.values.mwault_year, 10), 'property expiry WAULT ' + asset1.values.mwault_year);
   assert(closeNumber(asset1.values.break_date, 7.5), 'property break WAULT ' + asset1.values.break_date);
   assert(asset1Break.values.break_date instanceof Date, 'unit break stays a date');
   assert(closeNumber(asset1.values.area_sqft, 19998), 'property area sums matched unit areas ' + asset1.values.area_sqft);
-  assert(closeNumber(healthcare.values.area_sqft, 29997), 'sector area sums unit areas ' + healthcare.values.area_sqft);
   assert(closeNumber(grand.values.area_sqft, 29997), 'grand area sums portfolio unit areas ' + grand.values.area_sqft);
-  assert(closeNumber(healthcare.values.contracted_rent_pa, 4000), 'sector rent sums properties ' + healthcare.values.contracted_rent_pa);
-  assert(closeNumber(healthcare.values.contracted_rent_psf, 4000 / 29997), 'sector psf recalculates ' + healthcare.values.contracted_rent_psf);
+  assert(closeNumber(grand.values.contracted_rent_pa, 4000), 'grand rent sums properties ' + grand.values.contracted_rent_pa);
+  assert(closeNumber(grand.values.contracted_rent_psf, 4000 / 29997), 'grand psf recalculates ' + grand.values.contracted_rent_psf);
   assert(closeNumber(asset1.values.cv_psf, 5000 / 19998), 'property CV is fair value / area ' + asset1.values.cv_psf);
-  assert(closeNumber(healthcare.values.cv_psf, 12000 / 29997), 'sector CV is fair value / area ' + healthcare.values.cv_psf);
-  assert(healthcare.values.niy == null, 'sector yield stays blank');
-  assert(closeNumber(healthcare.values.mwault_year, (10 * 100 + 10 * 100 + 5 * 100) / 300), 'sector expiry WAULT');
-  assert(closeNumber(grand.values.break_date, healthcare.values.break_date), 'grand break WAULT uses units');
+  assert(closeNumber(grand.values.cv_psf, 12000 / 29997), 'grand CV is fair value / area ' + grand.values.cv_psf);
+  assert(grand.values.niy == null, 'grand yield stays blank');
+  assert(closeNumber(grand.values.mwault_year, (10 * 100 + 10 * 100 + 5 * 100) / 300), 'grand expiry WAULT');
+  assert(typeof grand.values.break_date === 'number', 'grand break WAULT uses units');
   const totalBook = buildWorkbookFromModel(totalModel);
   const totalSheet = totalBook.Sheets['Tenancy Schedule'];
-  assert(totalSheet.N4.t === 'n' && totalSheet.N4.z === '0.00', 'property break cell is a WAULT number');
-  assert(totalSheet.N5.t === 'd' && totalSheet.N5.z === 'dd/mm/yyyy', 'unit break cell stays a date');
-  assert(totalSheet.O9.t === 'n' && totalSheet.N9.z === '0.00', 'sector total WAULT formats');
+  assert(totalSheet.N3.t === 'n' && totalSheet.N3.z === '0.00', 'property break cell is a WAULT number');
+  assert(totalSheet.N4.t === 'd' && totalSheet.N4.z === 'dd/mm/yyyy', 'unit break cell stays a date');
   const annualFormat = '\u00a3#,##0';
   const headerRow = {};
   Object.keys(totalSheet).forEach(function (addr) {
@@ -337,27 +335,17 @@ try {
     const addr = XLSX.utils.encode_cell({ r: rowIndex, c: headerRow[header] });
     return totalSheet[addr];
   }
-  const contracted = formatAt('Contracted Rent (pa)', 3);
-  const deemed = formatAt('Deemed Rent (psf)', 3);
-  const market = formatAt('Market Rent (pa)', 3);
-  const fair = formatAt('Fair Value September 2026', 3);
-  const capital = formatAt('CV (psf)', 3);
+  const contracted = formatAt('Contracted Rent (pa)', 2);
+  const deemed = formatAt('Deemed Rent (psf)', 2);
+  const market = formatAt('Market Rent (pa)', 2);
+  const fair = formatAt('Fair Value September 2026', 2);
+  const capital = formatAt('CV (psf)', 2);
   assert(contracted.t === 'n' && contracted.z === annualFormat && contracted.v === 1000, 'contracted rent format ' + contracted.z);
   assert(deemed.t === 'n' && deemed.z === annualFormat && deemed.v === 1300903, 'deemed rent format ' + deemed.z + ' ' + deemed.v);
   assert(market.t === 'n' && market.z === annualFormat && market.v === 4460000, 'market rent format ' + market.z);
   assert(fair.t === 'n' && fair.z === annualFormat && fair.v === 5000, 'fair value format ' + fair.z);
   assert(capital.t === 'n' && capital.z === '\u00a3#,##0.00', 'capital value format ' + capital.z);
-  assert(totalSheet.C9.v === 'Healthcare TOTAL' && typeof totalSheet.H9.v === 'number', 'sector total values stay in their own cells');
-  assert(totalSheet.C11.v === 'GRAND TOTAL', 'grand total label');
-  function bandMatches(left, right) {
-    return left.s.fill.fgColor.rgb === right.s.fill.fgColor.rgb &&
-      left.s.font.name === right.s.font.name &&
-      left.s.font.sz === right.s.font.sz &&
-      left.s.font.bold === true &&
-      right.s.font.bold === true &&
-      left.s.font.color.rgb === 'FFFFFF' &&
-      right.s.font.color.rgb === 'FFFFFF';
-  }
+  assert(totalSheet.C9.v === 'GRAND TOTAL' && typeof totalSheet.H9.v === 'number', 'grand total values stay in their own cells');
   function noInternalVertical(rowIndex) {
     const range = XLSX.utils.decode_range(totalSheet['!ref']);
     const firstVisible = 2;
@@ -369,27 +357,23 @@ try {
     const last = totalSheet[XLSX.utils.encode_cell({ r: rowIndex, c: range.e.c })];
     return first.s.border.left && !first.s.border.right && last.s.border.right && !last.s.border.left;
   }
-  assert(bandMatches(totalSheet.C9, totalSheet.C11), 'grand total uses the sector total band');
-  assert(noInternalVertical(8) && noInternalVertical(10), 'summary rows have no internal vertical borders');
-  assert(totalSheet.C9.s.alignment.horizontal === 'left' && totalSheet.C11.s.alignment.horizontal === 'left', 'summary labels stay left');
-  assert(totalSheet.H9.s.alignment.horizontal === 'center' && totalSheet.H11.s.alignment.horizontal === 'center', 'summary values stay centred');
-  assert(!totalSheet['!merges'].some(function (merge) { return merge.s.r === 8 || merge.s.r === 10; }), 'summary rows stay unmerged');
-  const waultProperty = formatAt('WAULT (Years)', 3);
-  const waultSector = formatAt('WAULT (Years)', 8);
-  const waultGrand = formatAt('WAULT (Years)', 10);
-  const breakSector = formatAt('Break Date', 8);
-  const breakGrand = formatAt('Break Date', 10);
+  assert(String(totalSheet.C9.s.fill.fgColor.rgb).slice(-6) === '002060' && totalSheet.C9.s.font.color.rgb === 'FFFFFF' && totalSheet.C9.s.font.bold === true, 'grand total band');
+  assert(noInternalVertical(8), 'grand total has no internal vertical borders');
+  assert(totalSheet.C9.s.alignment.horizontal === 'left', 'summary labels stay left');
+  assert(totalSheet.H9.s.alignment.horizontal === 'center', 'summary values stay centred');
+  assert(!(totalSheet['!merges'] || []).some(function (merge) { return merge.s.r === 8; }), 'summary rows stay unmerged');
+  const waultProperty = formatAt('WAULT (Years)', 2);
+  const waultGrand = formatAt('WAULT (Years)', 8);
+  const breakGrand = formatAt('Break Date', 8);
   assert(waultProperty.t === 'n' && waultProperty.z === '0.00', 'property WAULT format');
-  assert(waultSector.t === 'n' && waultSector.z === '0.00' && waultSector.v !== Math.round(waultSector.v), 'sector WAULT keeps precision and displays 0.00');
-  assert(waultGrand.t === 'n' && waultGrand.z === '0.00', 'grand WAULT format');
-  assert(breakSector.t === 'n' && breakSector.z === '0.00', 'sector break WAULT format');
+  assert(waultGrand.t === 'n' && waultGrand.z === '0.00' && waultGrand.v !== Math.round(waultGrand.v), 'grand WAULT keeps precision and displays 0.00');
   assert(breakGrand.t === 'n' && breakGrand.z === '0.00', 'grand break WAULT format');
-  assert(formatAt('Deemed Rent (psf)', 8).z === annualFormat && formatAt('Deemed Rent (psf)', 10).z === annualFormat, 'summary deemed rent format');
-  assert(formatAt('Fair Value September 2026', 8).z === annualFormat && formatAt('Fair Value September 2026', 10).z === annualFormat, 'summary fair value format');
-  assert(formatAt('CV (psf)', 8).z === '\u00a3#,##0.00' && formatAt('CV (psf)', 10).z === '\u00a3#,##0.00', 'summary capital value format');
+  assert(formatAt('Deemed Rent (psf)', 8).z === annualFormat, 'summary deemed rent format');
+  assert(formatAt('Fair Value September 2026', 8).z === annualFormat, 'summary fair value format');
+  assert(formatAt('CV (psf)', 8).z === '\u00a3#,##0.00', 'summary capital value format');
   assert(formatAt('Area (sq ft)', 8).z === '#,##0' && formatAt('Contracted Rent (pa)', 8).z === annualFormat, 'summary area and rent formats');
-  assert(formatAt('CV (psf)', 3).t === 'n' && formatAt('CV (psf)', 3).z === '£#,##0.00', 'capital value format');
-  assert(formatAt('Fair Value September 2026', 3).t === 'n' && formatAt('Fair Value September 2026', 3).z === '£#,##0', 'fair value format');
+  assert(formatAt('CV (psf)', 2).t === 'n' && formatAt('CV (psf)', 2).z === '£#,##0.00', 'capital value format');
+  assert(formatAt('Fair Value September 2026', 2).t === 'n' && formatAt('Fair Value September 2026', 2).z === '£#,##0', 'fair value format');
   assert(formatAt('Fair Value September 2026', 0).v === 'Fair Value September 2026', 'written fair value heading');
 
   const propertyOnly = transformToPropertySummary(propertyParsed);
@@ -618,11 +602,10 @@ try {
   );
   const scopedUnitsOut = scopedModel.scheduleRows.filter(function (row) { return row.kind === 'unit'; });
   const scopedPropertyOut = scopedModel.scheduleRows.find(function (row) { return row.kind === 'property'; });
-  const scopedSector = scopedModel.scheduleRows.find(function (row) { return row.kind === 'sectorTotal'; });
   const scopedGrand = scopedModel.scheduleRows.find(function (row) { return row.kind === 'grandTotal'; });
+  assert(!scopedModel.scheduleRows.some(function (row) { return row.kind === 'group' || row.kind === 'groupTotal'; }), 'one property omits group sections');
   assert(scopedUnitsOut.map(function (row) { return row.values.area_sqft; }).join(',') === '10000,5500,2000', 'unit areas stay row-scoped');
   assert(closeNumber(scopedPropertyOut.values.area_sqft, 17500), 'property area 17500');
-  assert(closeNumber(scopedSector.values.area_sqft, 17500), 'sector area 17500');
   assert(closeNumber(scopedGrand.values.area_sqft, 17500), 'grand area 17500');
   assert(closeNumber(scopedPropertyOut.values.cv_psf, 10), 'property CV 10');
   assert(scopedPropertyOut.values.cv_psf !== scopedPropertyOut.values.fair_value, 'CV is not fair value');
@@ -647,7 +630,7 @@ try {
     const samplePropertyOnly = transformToPropertySummary(sampleProperty);
     const sampleCompare = runTenancyCompare(sampleUnit, sampleUnit);
     assert(sampleModel.ok && samplePropertyOnly.ok && sampleCompare.ok, 'sample fixtures failed');
-    assert(sampleModel.scheduleRows.some(function (row) { return row.kind === 'sector'; }), 'sample sector grouping');
+    assert(sampleModel.scheduleRows.some(function (row) { return row.kind === 'group'; }), 'sample sector grouping');
     const sampleBook = buildWorkbookFromModel(sampleModel);
     assert(sampleBook.Sheets['Tenancy Schedule'].C1.v === 'Property Reference', 'sample schedule header');
     function close(value, expected) {
@@ -674,7 +657,7 @@ try {
   const referenceUnit = totalModel.scheduleRows.find(function (row) { return row.kind === 'unit' && row.values.unit === 'A'; });
   assert(referenceUnit.values.asset_unit_reference === 'Asset 1_A', 'unit reference uses that row ' + referenceUnit.values.asset_unit_reference);
   assert(totalModel.scheduleRows.find(function (row) { return row.kind === 'property'; }).values.asset_unit_reference == null, 'property reference column stays blank');
-  assert(totalModel.scheduleRows.find(function (row) { return row.kind === 'sectorTotal'; }).values.tenant_reference == null, 'sector tenant reference stays blank');
+  assert(totalModel.scheduleRows.find(function (row) { return row.kind === 'grandTotal'; }).values.tenant_reference == null, 'grand tenant reference stays blank');
 
   setReportLayout(defaultOptionalIds().filter(function (id) { return id !== 'deemed_rent_psf' && id !== 'area_sqft'; }));
   const dependencyModel = transformToSchedule(
@@ -702,10 +685,10 @@ try {
     const decoded = XLSX.utils.decode_cell(addr);
     if (decoded.r === 0) reorderedHeaders[reorderedSheet[addr].v] = decoded.c;
   });
-  assert(reorderedSheet[XLSX.utils.encode_cell({ r: 3, c: reorderedHeaders['WAULT (Years)'] })].z === '0.00', 'moved WAULT keeps 0.00');
-  assert(reorderedSheet[XLSX.utils.encode_cell({ r: 3, c: reorderedHeaders['Area (sq ft)'] })].z === '#,##0', 'moved Area keeps its format');
-  const sectorTotal = reordered.scheduleRows.find(function (row) { return row.kind === 'sectorTotal'; });
-  assert(closeNumber(sectorTotal.values.mwault_year, (10 * 100 + 10 * 100 + 5 * 100) / 300), 'sector WAULT follows the field after reorder');
+  assert(reorderedSheet[XLSX.utils.encode_cell({ r: 2, c: reorderedHeaders['WAULT (Years)'] })].z === '0.00', 'moved WAULT keeps 0.00');
+  assert(reorderedSheet[XLSX.utils.encode_cell({ r: 2, c: reorderedHeaders['Area (sq ft)'] })].z === '#,##0', 'moved Area keeps its format');
+  const reorderedGrand = reordered.scheduleRows.find(function (row) { return row.kind === 'grandTotal'; });
+  assert(closeNumber(reorderedGrand.values.mwault_year, (10 * 100 + 10 * 100 + 5 * 100) / 300), 'grand WAULT follows the field after reorder');
   resetReportLayout();
 
   const currentJune = new Date(2026, 8, 30);
@@ -785,7 +768,7 @@ try {
   assert(unit01.values.fair_value__previous == null && unit01.values.fair_value__change == null, 'unit fair value comparison stays blank');
   const betaUnit = valuationCompare.scheduleRows.find(function (row) { return row.kind === 'unit' && row.values.unit === 'Unit 01' && row.values.market_rent_pa === 50; });
   assert(betaUnit.values.market_rent_pa__previous === 80, 'same unit name in another property does not cross-match');
-  const valuationHealthcare = valuationCompare.scheduleRows.find(function (row) { return row.kind === 'sectorTotal' && row.sector === 'Healthcare'; });
+  const valuationHealthcare = valuationCompare.scheduleRows.find(function (row) { return row.kind === 'groupTotal' && row.sector === 'Healthcare'; });
   assert(valuationHealthcare.values.fair_value__previous === 46800000 + 17720000 + 10000000, 'sector previous fair value sums matched property values');
   const valuationGrand = valuationCompare.scheduleRows.find(function (row) { return row.kind === 'grandTotal'; });
   assert(valuationGrand.values.fair_value__previous === 46800000 + 17720000 + 10000000, 'grand previous fair value ignores previous-only properties');
@@ -876,7 +859,7 @@ try {
   const capPropertyBlank = capModel.scheduleRows.find(function (row) { return row.kind === 'property' && row.values.address === 'Asset Blank'; });
   const capUnitA = capModel.scheduleRows.find(function (row) { return row.kind === 'unit' && row.values.unit === 'A'; });
   const capUnitB = capModel.scheduleRows.find(function (row) { return row.kind === 'unit' && row.values.unit === 'B'; });
-  const capHealthcare = capModel.scheduleRows.find(function (row) { return row.kind === 'sectorTotal' && row.sector === 'Healthcare'; });
+  const capHealthcare = capModel.scheduleRows.find(function (row) { return row.kind === 'groupTotal' && row.sector === 'Healthcare'; });
   const capGrand = capModel.scheduleRows.find(function (row) { return row.kind === 'grandTotal'; });
   assert(capPropertyA && capPropertyA.values.cap_ex === -130000, 'property cap ex keeps the source sign, got ' + (capPropertyA && capPropertyA.values.cap_ex));
   assert(capPropertyB && capPropertyB.values.cap_ex === 70000, 'positive property cap ex is not flipped by the unit rule');
@@ -898,13 +881,13 @@ try {
   const capUnitExcel = capModel.scheduleRows.findIndex(function (row) { return row.kind === 'unit' && row.values.unit === 'A'; });
   const capUnitCell = capSheet[XLSX.utils.encode_cell({ r: capUnitExcel + 2, c: capCol })];
   assert(capUnitCell && capUnitCell.v === -15000 && capUnitCell.z === capFormat && capUnitCell.s.font.color.rgb === '000000', 'negative unit cap ex stays black');
-  const capTotalExcel = capModel.scheduleRows.findIndex(function (row) { return row.kind === 'sectorTotal' && row.sector === 'Healthcare'; });
+  const capTotalExcel = capModel.scheduleRows.findIndex(function (row) { return row.kind === 'groupTotal' && row.sector === 'Healthcare'; });
   const capTotalCell = capSheet[XLSX.utils.encode_cell({ r: capTotalExcel + 2, c: capCol })];
   assert(capTotalCell && capTotalCell.v === -60000 && capTotalCell.s.font.color.rgb === 'FFFFFF', 'sector cap ex keeps the summary font');
   const capGrandExcel = capModel.scheduleRows.findIndex(function (row) { return row.kind === 'grandTotal'; });
   const capGrandCell = capSheet[XLSX.utils.encode_cell({ r: capGrandExcel + 2, c: capCol })];
   assert(capGrandCell && capGrandCell.v === -10000 && capGrandCell.s.font.color.rgb === 'FFFFFF', 'grand cap ex keeps the summary font');
-  ['sector', 'property', 'unit', 'sectorTotal', 'grandTotal'].forEach(function (kind) {
+  ['group', 'property', 'unit', 'groupTotal', 'grandTotal'].forEach(function (kind) {
     const rowIndex = capModel.scheduleRows.findIndex(function (row) { return row.kind === kind; });
     assert(rowIndex !== -1 && capSheet['!rows'][rowIndex + 2].hpt === 24, kind + ' cap workbook row height');
   });
@@ -953,6 +936,218 @@ try {
     assert(cell.v === item.value && Object.is(cell.v, item.value) && cell.s.font.color.rgb === item.color && cell.z === '0.00%', 'fair value change ' + item.name + ' uses two-decimal percentage tolerance');
   });
   resetReportLayout();
+
+  const {
+    assessBreakdown,
+    buildPortfolioGroups,
+    classifyGroupValue,
+    getBreakdownMode,
+    getCustomConfig,
+    reconcileCustomAssignments,
+    resetPortfolioBreakdown,
+    setBreakdownMode,
+    setCustomConfig,
+    breakdownSpecification,
+  } = await vite.ssrLoadModule('/src/logic/portfolioBreakdown.js');
+  assert(getBreakdownMode() === 'sector', 'portfolio breakdown defaults to sector');
+  assert(classifyGroupValue('  Industrial   Park ').key === 'industrial park', 'grouping collapses whitespace');
+  assert(classifyGroupValue('UNCLASSIFIED').unclassified && classifyGroupValue('').unclassified, 'blank and unclassified share one bucket');
+
+  async function breakdownModel(rows, mode, extraRefs, customConfig) {
+    const refs = propertyRefs.concat(extraRefs || []);
+    const bytes = makeWorkbook(refs, rows.map(function (row) {
+      return valuesRow(refs, Object.assign({
+        'General|Property Name': row.name,
+        'General|External ID': row.id,
+        'General|Sector': row.sector,
+        'General|Traditional Valuation Date': valuationDate,
+        'General|City': 'Leeds',
+        'General|Region / Country': row.region,
+      }, row.extra || {}));
+    }));
+    const units = makeWorkbook(unitRefs, rows.map(function (row, index) {
+      return unitMap(row.name, 'U' + (index + 1), 'Tenant ' + row.id, {});
+    }));
+    return transformToSchedule(
+      await parseBuffer(bytes, 'breakdown-property.xlsx', 'property'),
+      await parseBuffer(units, 'breakdown-units.xlsx', 'unit'),
+      { breakdown: { mode: mode, customConfig: customConfig } }
+    );
+  }
+  function groupOutline(model) {
+    return model.scheduleRows.map(function (row) {
+      if (row.kind === 'group') return 'group:' + row.group;
+      if (row.kind === 'groupTotal') return 'total:' + row.values.property_reference;
+      if (row.kind === 'property') return 'property:' + row.values.property_reference;
+      if (row.kind === 'separator' || row.kind === 'grandTotal') return row.kind;
+      return '';
+    }).filter(Boolean).join('|');
+  }
+
+  const sectorBreakdown = await breakdownModel([
+    { id: 'P1', name: 'Alpha', sector: 'Healthcare' },
+    { id: 'P2', name: 'Beta', sector: 'Industrial' },
+    { id: 'P3', name: 'Gamma', sector: ' healthcare ' },
+    { id: 'P4', name: 'Delta', sector: '   ' },
+  ], 'sector');
+  assert(groupOutline(sectorBreakdown) === 'group:Healthcare|property:P1|property:P3|total:Healthcare TOTAL|separator|group:Industrial|property:P2|total:Industrial TOTAL|separator|group:Unclassified|property:P4|total:Unclassified TOTAL|separator|grandTotal', 'sector breakdown outline ' + groupOutline(sectorBreakdown));
+
+  const regionBreakdown = await breakdownModel([
+    { id: 'P1', name: 'Alpha', region: 'UK' },
+    { id: 'P2', name: 'Beta', region: 'Ireland' },
+    { id: 'P3', name: 'Gamma', region: ' uk ' },
+    { id: 'P4', name: 'Delta', region: '' },
+  ], 'region_country', [{ section: 'General', field: 'Region / Country' }]);
+  assert(groupOutline(regionBreakdown) === 'group:UK|property:P1|property:P3|total:UK TOTAL|separator|group:Ireland|property:P2|total:Ireland TOTAL|separator|group:Unclassified|property:P4|total:Unclassified TOTAL|separator|grandTotal', 'region breakdown outline ' + groupOutline(regionBreakdown));
+
+  const plainBreakdown = await breakdownModel([
+    { id: 'P1', name: 'Alpha', sector: 'Healthcare' },
+    { id: 'P2', name: 'Beta', sector: 'Industrial' },
+    { id: 'P3', name: 'Gamma', sector: 'Offices' },
+  ], 'none');
+  assert(groupOutline(plainBreakdown) === 'property:P1|property:P2|property:P3|separator|grandTotal', 'no breakdown outline ' + groupOutline(plainBreakdown));
+  assert(!plainBreakdown.scheduleRows.some(function (row) { return row.kind === 'group' || row.kind === 'groupTotal'; }), 'no breakdown has no group rows');
+
+  const blankSectors = makeWorkbook(propertyRefs, [
+    propertyMap('Blank A', ''),
+    propertyMap('Blank B', '   '),
+  ]);
+  const blankParsed = await parseBuffer(blankSectors, 'blank-sectors.xlsx', 'property');
+  setBreakdownMode('sector');
+  const blankAssessment = assessBreakdown(blankParsed, 'sector');
+  assert(blankAssessment.message === 'Sector is not populated. The schedule will be generated without group sections.', 'unpopulated sector note');
+  assert(getBreakdownMode() === 'sector', 'unpopulated sector does not change the selection');
+  const regionAssessment = assessBreakdown(blankParsed, 'region_country');
+  assert(regionAssessment.message === 'Region / Country is not populated. The schedule will be generated without group sections.', 'unpopulated region note');
+
+  const customBreakdown = await breakdownModel([
+    { id: 'P1', name: 'Alpha House', sector: 'Healthcare' },
+    { id: 'P2', name: 'Beta House', sector: 'Industrial' },
+    { id: 'P3', name: 'Gamma House', sector: 'Offices' },
+    { id: 'P4', name: 'Delta House', sector: 'Retail' },
+    { id: 'P5', name: 'Echo House', sector: 'Healthcare' },
+  ], 'custom', [], {
+    groups: [{ id: 'core', name: 'Core' }, { id: 'value', name: 'Value Add' }],
+    assignments: { p1: 'core', p3: 'core', p2: 'value', p5: 'value' },
+  });
+  assert(groupOutline(customBreakdown) === 'group:Core|property:P1|property:P3|total:Core TOTAL|separator|group:Value Add|property:P2|property:P5|total:Value Add TOTAL|separator|group:Unclassified|property:P4|total:Unclassified TOTAL|separator|grandTotal', 'custom breakdown outline ' + groupOutline(customBreakdown));
+
+  setCustomConfig({
+    groups: [{ id: 'core', name: 'Core' }, { id: 'value', name: 'Value Add' }],
+    assignments: { p1: 'core', p2: 'value', p3: 'core' },
+  });
+  const replacement = makeWorkbook(propertyRefs, [
+    propertyMap('Alpha House', 'Healthcare', { 'General|External ID': 'P1' }),
+    propertyMap('Beta House', 'Industrial', { 'General|External ID': 'P2' }),
+    propertyMap('Delta House', 'Retail', { 'General|External ID': 'P4' }),
+  ]);
+  reconcileCustomAssignments(await parseBuffer(replacement, 'replacement.xlsx', 'property'));
+  const reconciled = getCustomConfig();
+  assert(reconciled.assignments.p1 === 'core' && reconciled.assignments.p2 === 'value' && !reconciled.assignments.p3 && !reconciled.assignments.p4, 'custom assignments reconcile by external id ' + JSON.stringify(reconciled.assignments));
+  setBreakdownMode('custom');
+  const specBreakdown = breakdownSpecification();
+  assert(specBreakdown.mode === 'custom' && !specBreakdown.assignments && !specBreakdown.groups, 'draft breakdown metadata excludes asset assignments');
+  setBreakdownMode('sector');
+  assert(breakdownSpecification().source.field === 'Sector', 'sector breakdown source field');
+  setBreakdownMode('region_country');
+  assert(breakdownSpecification().source.field === 'Region / Country', 'region breakdown source field');
+  const groupedSheet = buildWorkbookFromModel(sectorBreakdown).Sheets['Tenancy Schedule'];
+  assert(groupedSheet['!rows'][0].hpt === 40 && groupedSheet['!rows'][1].hpt === 8, 'breakdown header heights');
+  function assertUngrouped(model, label) {
+    assert(groupOutline(model).indexOf('group:') === -1 && groupOutline(model).indexOf('total:') === -1, label + ' has no group sections ' + groupOutline(model));
+    assert(model.scheduleRows.some(function (row) { return row.kind === 'grandTotal'; }), label + ' keeps grand total');
+  }
+  const healthcareOnly = await breakdownModel([
+    { id: 'P1', name: 'Alpha', sector: 'Healthcare' },
+    { id: 'P2', name: 'Beta', sector: 'Healthcare' },
+    { id: 'P3', name: 'Gamma', sector: ' healthcare ' },
+    { id: 'P4', name: 'Delta', sector: 'HEALTHCARE' },
+  ], 'sector');
+  assertUngrouped(healthcareOnly, 'single sector');
+  assert(groupOutline(healthcareOnly) === 'property:P1|property:P2|property:P3|property:P4|separator|grandTotal', 'single sector outline ' + groupOutline(healthcareOnly));
+  const healthcareOnlyParsed = await parseBuffer(makeWorkbook(propertyRefs, [
+    propertyMap('Alpha', 'Healthcare', { 'General|External ID': 'P1' }),
+    propertyMap('Beta', 'Healthcare', { 'General|External ID': 'P2' }),
+  ]), 'one-sector.xlsx', 'property');
+  assert(assessBreakdown(healthcareOnlyParsed, 'sector').message === 'Only one Sector group is present. The schedule will be generated without group sections.', 'single sector note');
+  assert(getBreakdownMode() === 'region_country', 'single sector note does not change the selected breakdown');
+
+  const allBlankSector = await breakdownModel([
+    { id: 'P1', name: 'Alpha', sector: '' },
+    { id: 'P2', name: 'Beta', sector: 'Unclassified' },
+    { id: 'P3', name: 'Gamma', sector: '   ' },
+  ], 'sector');
+  assertUngrouped(allBlankSector, 'all blank sector');
+
+  const sectorAndBlank = await breakdownModel([
+    { id: 'P1', name: 'Alpha', sector: 'Healthcare' },
+    { id: 'P2', name: 'Beta', sector: 'Healthcare' },
+    { id: 'P3', name: 'Gamma', sector: '' },
+  ], 'sector');
+  assert(groupOutline(sectorAndBlank) === 'group:Healthcare|property:P1|property:P2|total:Healthcare TOTAL|separator|group:Unclassified|property:P3|total:Unclassified TOTAL|separator|grandTotal', 'healthcare plus blank stays grouped ' + groupOutline(sectorAndBlank));
+
+  const twoSectors = await breakdownModel([
+    { id: 'P1', name: 'Alpha', sector: 'Healthcare' },
+    { id: 'P2', name: 'Beta', sector: 'Industrial' },
+  ], 'sector');
+  assert(groupOutline(twoSectors) === 'group:Healthcare|property:P1|total:Healthcare TOTAL|separator|group:Industrial|property:P2|total:Industrial TOTAL|separator|grandTotal', 'two sectors stay grouped ' + groupOutline(twoSectors));
+
+  const ukOnly = await breakdownModel([
+    { id: 'P1', name: 'Alpha', region: 'UK' },
+    { id: 'P2', name: 'Beta', region: ' uk ' },
+    { id: 'P3', name: 'Gamma', region: 'UK' },
+  ], 'region_country', [{ section: 'General', field: 'Region / Country' }]);
+  assertUngrouped(ukOnly, 'single region');
+  const regionRefs = propertyRefs.concat([{ section: 'General', field: 'Region / Country' }]);
+  const ukOnlyParsed = await parseBuffer(makeWorkbook(regionRefs, [
+    valuesRow(regionRefs, { 'General|Property Name': 'Alpha', 'General|External ID': 'P1', 'General|Sector': 'Healthcare', 'General|Region / Country': 'UK' }),
+    valuesRow(regionRefs, { 'General|Property Name': 'Beta', 'General|External ID': 'P2', 'General|Sector': 'Healthcare', 'General|Region / Country': 'UK' }),
+  ]), 'one-region.xlsx', 'property');
+  assert(assessBreakdown(ukOnlyParsed, 'region_country').message === 'Only one Region / Country group is present. The schedule will be generated without group sections.', 'single region note');
+
+  const twoRegions = await breakdownModel([
+    { id: 'P1', name: 'Alpha', region: 'UK' },
+    { id: 'P2', name: 'Beta', region: 'Ireland' },
+    { id: 'P3', name: 'Gamma', region: 'UK' },
+  ], 'region_country', [{ section: 'General', field: 'Region / Country' }]);
+  assert(groupOutline(twoRegions) === 'group:UK|property:P1|property:P3|total:UK TOTAL|separator|group:Ireland|property:P2|total:Ireland TOTAL|separator|grandTotal', 'two regions stay grouped ' + groupOutline(twoRegions));
+
+  const oneCustom = await breakdownModel([
+    { id: 'P1', name: 'Alpha', sector: 'Healthcare' },
+    { id: 'P2', name: 'Beta', sector: 'Industrial' },
+    { id: 'P3', name: 'Gamma', sector: 'Offices' },
+  ], 'custom', [], {
+    groups: [{ id: 'core', name: 'Core' }],
+    assignments: { p1: 'core', p2: 'core', p3: 'core' },
+  });
+  assertUngrouped(oneCustom, 'single custom group');
+
+  const unassignedCustom = await breakdownModel([
+    { id: 'P1', name: 'Alpha', sector: 'Healthcare' },
+    { id: 'P2', name: 'Beta', sector: 'Industrial' },
+  ], 'custom', [], {
+    groups: [{ id: 'core', name: 'Core' }],
+    assignments: {},
+  });
+  assertUngrouped(unassignedCustom, 'unassigned custom');
+
+  const twoCustom = await breakdownModel([
+    { id: 'P1', name: 'Alpha', sector: 'Healthcare' },
+    { id: 'P2', name: 'Beta', sector: 'Industrial' },
+    { id: 'P3', name: 'Gamma', sector: 'Offices' },
+  ], 'custom', [], {
+    groups: [{ id: 'core', name: 'Core' }, { id: 'value', name: 'Value Add' }],
+    assignments: { p1: 'core', p2: 'value', p3: 'core' },
+  });
+  assert(groupOutline(twoCustom) === 'group:Core|property:P1|property:P3|total:Core TOTAL|separator|group:Value Add|property:P2|total:Value Add TOTAL|separator|grandTotal', 'two custom groups stay grouped ' + groupOutline(twoCustom));
+  assert(getBreakdownMode() === 'region_country', 'generation does not change the selected breakdown');
+
+  sectorBreakdown.scheduleRows.forEach(function (row, index) {
+    const height = groupedSheet['!rows'][index + 2].hpt;
+    if (row.kind === 'separator') assert(height === 8, 'breakdown separator height');
+    else assert(height === 24, row.kind + ' breakdown height ' + height);
+  });
+  resetPortfolioBreakdown();
 
   console.log(failures.length ? 'REGRESSION FAILED' : 'OK: regression');
 } catch (err) {

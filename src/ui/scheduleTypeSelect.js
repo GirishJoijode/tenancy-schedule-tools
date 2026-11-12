@@ -6,6 +6,7 @@ import {
 import { APP_STATE } from '../state.js';
 import { escapeHtml } from './common.js';
 import { refreshReportFieldsAvailability } from '../standardiser/reportFields.js';
+import { refreshPortfolioBreakdownChrome } from './portfolioBreakdown.js';
 
 var open = false;
 var highlightIndex = -1;
@@ -38,6 +39,7 @@ function applyScheduleType(type) {
   if (els.triggerLabel) els.triggerLabel.textContent = type.label;
   if (els.blurb) els.blurb.textContent = type.description;
   refreshReportFieldsAvailability();
+  refreshPortfolioBreakdownChrome();
   if (els.trigger) els.trigger.setAttribute('aria-label', 'Schedule type, ' + type.label);
   renderMenu();
 }

@@ -49,6 +49,32 @@
       ></ul>
     </div>
     </div>
+    <div class="schedule-type-field breakdown-field" id="portfolio-breakdown-field">
+      <label class="schedule-type-label" id="portfolio-breakdown-label" for="portfolio-breakdown-trigger">Portfolio Breakdown</label>
+      <div class="breakdown-line">
+        <div class="schedule-type-select" id="portfolio-breakdown-select">
+          <button
+            type="button"
+            class="schedule-type-trigger"
+            id="portfolio-breakdown-trigger"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-controls="portfolio-breakdown-menu"
+            aria-labelledby="portfolio-breakdown-label portfolio-breakdown-trigger-label"
+          >
+            <span id="portfolio-breakdown-trigger-label">Sector</span>
+            <span class="schedule-type-chevron" aria-hidden="true"></span>
+          </button>
+          <ul
+            class="schedule-type-menu hidden"
+            id="portfolio-breakdown-menu"
+            role="listbox"
+            aria-labelledby="portfolio-breakdown-label"
+          ></ul>
+        </div>
+        <button type="button" class="breakdown-edit" id="portfolio-breakdown-edit" hidden>Edit Groups</button>
+      </div>
+    </div>
     <button type="button" class="report-fields-btn" id="report-fields-btn" title="Choose and arrange optional report columns. Required and system fields remain fixed.">
       <svg class="report-fields-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
         <rect x="1" y="1" width="6" height="6" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
@@ -59,6 +85,7 @@
       Report Fields
     </button>
     </div>
+    <p class="breakdown-note" id="portfolio-breakdown-note" hidden></p>
     <p class="schedule-type-blurb" id="schedule-type-blurb">
       Convert Property and Unit level exports into the standard tenancy schedule.
     </p>
@@ -476,6 +503,21 @@
     </header>
     <div id="report-fields-root" class="report-body"></div>
     <footer id="report-fields-footer" class="report-footer"></footer>
+  </div>
+</div>
+
+<div id="portfolio-breakdown-modal" class="report-modal hidden" role="dialog" aria-modal="true" aria-labelledby="portfolio-breakdown-title" aria-describedby="portfolio-breakdown-subtitle" hidden>
+  <div class="report-backdrop" data-breakdown-dismiss></div>
+  <div class="report-dialog group-dialog">
+    <header class="report-modal-header">
+      <div>
+        <h2 id="portfolio-breakdown-title">Custom Portfolio Breakdown</h2>
+        <p id="portfolio-breakdown-subtitle">Create your own portfolio groups and assign properties to them.</p>
+      </div>
+      <button type="button" class="report-close" id="portfolio-breakdown-close" aria-label="Close custom portfolio breakdown">×</button>
+    </header>
+    <div id="portfolio-breakdown-root" class="report-body"></div>
+    <footer id="portfolio-breakdown-footer" class="report-footer"></footer>
   </div>
 </div>
 
