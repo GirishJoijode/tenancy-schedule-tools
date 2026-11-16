@@ -1,5 +1,5 @@
 export var AM_HORIZONS = [6, 12, 24, 36];
-export var AM_DEFAULT_HORIZON = 12;
+export var AM_DEFAULT_HORIZON = 36;
 
 var EVENT_LABELS = {
   rent_review: 'Rent Review',
@@ -64,10 +64,9 @@ export function timingLabel(valuationDate, eventDate) {
   return days < 0 ? amount + ' before the valuation date' : amount + ' after the valuation date';
 }
 
-function inWindow(valuationDate, eventDate, horizonMonths) {
-  var start = addCalendarMonths(valuationDate, -horizonMonths);
-  var end = addCalendarMonths(valuationDate, horizonMonths);
-  return eventDate >= start && eventDate <= end;
+function inReviewScope(valuationDate, eventDate, horizonMonths) {
+  if (eventDate < valuationDate) return true;
+  return eventDate <= addCalendarMonths(valuationDate, horizonMonths);
 }
 
 function monthKey(date) {
@@ -96,48 +95,21 @@ function textValue(value) {
   return String(value).replace(/\s+/g, ' ').trim();
 }
 
-function reviewTemplates(status, timing) {
-  if (status === 'historic') {
-    return {
-      title: 'Historic Rent Review',
-      observation: 'Rent review date was ' + timing + '.',
-      suggestedQuery: 'Please confirm the status and outcome of the rent review.',
-    };
-  }
-  return {
-    title: 'Upcoming Rent Review',
-    observation: 'The recorded rent review date is ' + timing + '.',
-    suggestedQuery: 'Please provide an update on preparations or discussions relating to the upcoming rent review.',
-  };
+function eventTitle(eventType, status) {
+  if (eventType === 'rent_review') return status === 'historic' ? 'Historic Rent Review' : 'Upcoming Rent Review';
+  if (eventType === 'break') return status === 'historic' ? 'Historic Break' : 'Upcoming Break';
+  return status === 'historic' ? 'Lease Expiry Passed' : 'Upcoming Lease Expiry';
 }
 
-function breakTemplates(status) {
-  if (status === 'historic') {
-    return {
-      title: 'Historic Break',
-      observation: 'The recorded effective break date precedes the valuation date.',
-      suggestedQuery: 'Please confirm the current lease position following the recorded break date.',
-    };
-  }
+function leaseFacts(unitValues) {
+  var values = unitValues || {};
   return {
-    title: 'Upcoming Break',
-    observation: 'The recorded effective break date falls within the selected review horizon.',
-    suggestedQuery: 'Please confirm whether the tenant has indicated its intentions in relation to the upcoming break option.',
-  };
-}
-
-function expiryTemplates(status) {
-  if (status === 'historic') {
-    return {
-      title: 'Lease Expiry Passed',
-      observation: 'The recorded lease expiry date precedes the valuation date.',
-      suggestedQuery: 'Please confirm the current occupational position and whether the tenancy is holding over, renewed or otherwise documented.',
-    };
-  }
-  return {
-    title: 'Upcoming Lease Expiry',
-    observation: 'Lease expiry falls within the selected review horizon.',
-    suggestedQuery: 'Please provide an update on renewal, retention or reletting discussions ahead of lease expiry.',
+    contractedRent: numericRent(values.contracted_rent_pa),
+    currentRent: numericRent(values.deemed_rent_psf), // Unit Variable → Current Rent, stored on deemed_rent_psf.
+    reviewedRent: null,
+    marketRent: numericRent(values.market_rent_pa),
+    rentFreeMonths: numericRent(values.rent_free_month),
+    expiryVoidMonths: numericRent(values.expiry_void_month),
   };
 }
 
@@ -149,7 +121,6 @@ export var AM_QUERY_RULES = [
     eventType: 'rent_review',
     dateField: 'review_date',
     source: 'Unit / TS → Variable → Next Review',
-    templates: reviewTemplates,
   },
   {
     id: 'break',
@@ -158,7 +129,6 @@ export var AM_QUERY_RULES = [
     eventType: 'break',
     dateField: 'break_date',
     source: 'Unit / TS → General → Effective Break',
-    templates: function (status) { return breakTemplates(status); },
   },
   {
     id: 'expiry',
@@ -167,7 +137,6 @@ export var AM_QUERY_RULES = [
     eventType: 'expiry',
     dateField: 'expiry_date',
     source: 'Unit / TS → General → Lease Expiry',
-    templates: function (status) { return expiryTemplates(status); },
   },
 ];
 
@@ -225,14 +194,13 @@ export function runAssetManagementReview(options) {
       var unitName = textValue(unitValues.unit) || 'Unit';
       var tenantName = textValue(unitValues.tenant_name);
       var unitId = propertyId + ':' + (textValue(unitValues.unit) || 'unit') + ':' + unitIndex;
-      var rent = numericRent(unitValues.contracted_rent_pa);
+      var facts = leaseFacts(unitValues);
 
       AM_QUERY_RULES.forEach(function (rule) {
         var eventDate = calendarDate(unitValues[rule.dateField]);
-        if (!eventDate || !inWindow(valuationDate, eventDate, horizonMonths)) return;
+        if (!eventDate || !inReviewScope(valuationDate, eventDate, horizonMonths)) return;
         var status = eventDate < valuationDate ? 'historic' : 'upcoming';
         var timing = timingLabel(valuationDate, eventDate);
-        var copy = rule.templates(status, timing);
         findings.push({
           id: rule.id + '|' + unitId,
           ruleId: rule.id,
@@ -255,10 +223,14 @@ export function runAssetManagementReview(options) {
           valuationLabel: formatDisplayDate(valuationDate),
           eventLabel: formatDisplayDate(eventDate),
           timing: timing,
-          contractedRent: rent,
-          title: copy.title,
-          observation: copy.observation,
-          suggestedQuery: copy.suggestedQuery,
+          contractedRent: facts.contractedRent,
+          currentRent: facts.currentRent,
+          reviewedRent: facts.reviewedRent,
+          marketRent: facts.marketRent,
+          rentFreeMonths: facts.rentFreeMonths,
+          expiryVoidMonths: facts.expiryVoidMonths,
+          breakVoidMonths: null,
+          title: eventTitle(rule.eventType, status),
           source: rule.source,
         });
       });
@@ -288,7 +260,6 @@ function matchesDashboard(finding, filters) {
   if (filters.propertyId && finding.propertyId !== filters.propertyId) return false;
   if (filters.groupId && finding.groupId !== filters.groupId) return false;
   if (filters.eventType && filters.eventType !== 'all' && finding.eventType !== filters.eventType) return false;
-  if (filters.status && filters.status !== 'all' && finding.status !== filters.status) return false;
   return true;
 }
 

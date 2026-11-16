@@ -1149,6 +1149,7 @@ try {
   });
   const { buildPortfolio } = await vite.ssrLoadModule('/src/model/portfolio.js');
   const {
+    AM_DEFAULT_HORIZON,
     addCalendarMonths,
     assetQueryGroupOptions,
     canRunAssetQueries,
@@ -1159,6 +1160,10 @@ try {
   const { readFileSync: readAmSource } = await import('node:fs');
   const amSource = readAmSource(resolve(root, 'src/logic/assetQueries.js'), 'utf8') + '\n' + readAmSource(resolve(root, 'src/ui/assetQueries.js'), 'utf8');
   assert(!/\bfetch\s*\(/.test(amSource) && amSource.indexOf('localStorage') === -1 && !/api\.openai|generativelanguage|anthropic/i.test(amSource), 'asset queries stay in the browser');
+  assert(AM_DEFAULT_HORIZON === 36, 'event horizon defaults to 36 months');
+  assert(amSource.indexOf('am-status') === -1 && amSource.indexOf('data-am-filter="status"') === -1, 'status filter is removed');
+  assert(amSource.indexOf('Lease Event Detail') !== -1 && amSource.indexOf('Query detail') === -1 && amSource.indexOf('Potential AM query') === -1 && amSource.indexOf('Observation') === -1, 'drawer is lease event detail without generated wording');
+  assert(!/Please (confirm|provide|discuss)/i.test(amSource) && amSource.indexOf('suggestedQuery') === -1 && amSource.indexOf('High Priority') === -1 && amSource.indexOf('AM_PRIORITY') === -1, 'no query text or priority ranking');
   assert(canRunAssetQueries(null, null) === false && canRunAssetQueries({}, null) === false && canRunAssetQueries(null, {}) === false && canRunAssetQueries({}, {}) === true, 'asset queries require both current files');
   assert(assetQueryGroupOptions({ effective: false, groups: [{ id: 'a', label: 'Healthcare' }] }).length === 0, 'single group hides the group filter');
   assert(assetQueryGroupOptions({ effective: true, groups: [{ id: 'healthcare', label: 'Healthcare' }, { id: 'industrial', label: 'Industrial' }] }).map(function (group) { return group.label; }).join('|') === 'Healthcare|Industrial', 'multiple groups are offered');
@@ -1171,9 +1176,9 @@ try {
     return { standardValues: Object.assign({ unit: name, tenant_name: tenant }, values) };
   }
   const amAlpha = amProperty('P1', 'Alpha House', [
-    amUnit('A', 'Tenant A', { review_date: new Date(2026, 11, 31), contracted_rent_pa: 1000, expiry_date: new Date(2040, 0, 1) }),
-    amUnit('B', 'Tenant B', { break_date: new Date(2026, 5, 30), expiry_date: new Date(2040, 0, 1) }),
-    amUnit('C', 'Tenant C', { expiry_date: new Date(2027, 7, 31) }),
+    amUnit('A', 'Tenant A', { review_date: new Date(2026, 11, 31), contracted_rent_pa: 1000, deemed_rent_psf: 900, market_rent_pa: 1100, expiry_date: new Date(2040, 0, 1) }),
+    amUnit('B', 'Tenant B', { break_date: new Date(2026, 5, 30), contracted_rent_pa: 800, deemed_rent_psf: 750, market_rent_pa: 820, rent_free_month: 6, expiry_date: new Date(2040, 0, 1) }),
+    amUnit('C', 'Tenant C', { expiry_date: new Date(2027, 7, 31), contracted_rent_pa: 0, rent_free_month: 3, market_rent_pa: 400 }),
     amUnit('D', 'Tenant D', { expiry_date: new Date(2029, 11, 31) }),
   ]);
   const amBeta = amProperty('P2', 'Beta House', [
@@ -1195,13 +1200,12 @@ try {
   }
   const upcomingReview = titled(amReview, 'Upcoming Rent Review').filter(function (finding) { return finding.unitName === 'A'; });
   assert(upcomingReview.length === 1 && upcomingReview[0].status === 'upcoming' && !upcomingReview[0].priority && upcomingReview[0].timing === '3 months after the valuation date', 'December review stays an upcoming rent review ' + (upcomingReview[0] && upcomingReview[0].timing));
-  assert(upcomingReview[0].suggestedQuery === 'Please provide an update on preparations or discussions relating to the upcoming rent review.', 'upcoming review query');
+  assert(upcomingReview[0].contractedRent === 1000 && upcomingReview[0].currentRent === 900 && upcomingReview[0].marketRent === 1100 && upcomingReview[0].reviewedRent === null && !upcomingReview[0].observation && !upcomingReview[0].suggestedQuery, 'rent review keeps factual lease amounts only');
   assert(upcomingReview[0].source === 'Unit / TS → Variable → Next Review', 'review source');
   const historicBreak = titled(amReview, 'Historic Break');
-  assert(historicBreak.length === 1 && historicBreak[0].status === 'historic' && !historicBreak[0].priority && historicBreak[0].observation === 'The recorded effective break date precedes the valuation date.', 'historic break stays a pre-valuation event');
-  assert(historicBreak[0].suggestedQuery === 'Please confirm the current lease position following the recorded break date.', 'historic break query');
+  assert(historicBreak.length === 1 && historicBreak[0].status === 'historic' && !historicBreak[0].priority && historicBreak[0].rentFreeMonths === 6 && historicBreak[0].breakVoidMonths === null, 'historic break stays a pre-valuation event with rent free and no break void');
   const upcomingExpiry = titled(amReview, 'Upcoming Lease Expiry').filter(function (finding) { return finding.unitName === 'C'; });
-  assert(upcomingExpiry.length === 1 && upcomingExpiry[0].status === 'upcoming' && !upcomingExpiry[0].priority, 'August 2027 expiry stays an upcoming event');
+  assert(upcomingExpiry.length === 1 && upcomingExpiry[0].status === 'upcoming' && !upcomingExpiry[0].priority && upcomingExpiry[0].contractedRent === 0 && upcomingExpiry[0].currentRent === null && upcomingExpiry[0].rentFreeMonths === 3 && upcomingExpiry[0].expiryVoidMonths === null, 'August 2027 expiry stays an upcoming event and keeps a genuine zero rent');
   assert(!amReview.findings.some(function (finding) { return finding.unitName === 'D'; }), 'December 2029 expiry is outside 12 and 36 months');
   const exactHigh = runAssetManagementReview({
     properties: [amProperty('P3', 'Gamma', [amUnit('Z', 'Tenant Z', { review_date: addCalendarMonths(amValuation, 3) })])],
@@ -1218,6 +1222,27 @@ try {
     horizonMonths: 12,
   });
   assert(narrow.findings.length === 0, '12 month horizon excludes March 2029');
+  const horizonScope = runAssetManagementReview({
+    properties: [amProperty('P9', 'Horizon House', [
+      amUnit('Old', 'Tenant Old', { expiry_date: new Date(2019, 0, 15), contracted_rent_pa: 10 }),
+      amUnit('Soon', 'Tenant Soon', { expiry_date: addCalendarMonths(amValuation, 5) }),
+      amUnit('Later', 'Tenant Later', { expiry_date: addCalendarMonths(amValuation, 8) }),
+      amUnit('Far', 'Tenant Far', { expiry_date: addCalendarMonths(amValuation, 40) }),
+    ])],
+    horizonMonths: 6,
+  });
+  assert(horizonScope.findings.some(function (finding) { return finding.unitName === 'Old' && finding.status === 'historic'; }), 'a 6 month horizon still includes pre-valuation events');
+  assert(horizonScope.findings.some(function (finding) { return finding.unitName === 'Soon' && finding.status === 'upcoming'; }) && !horizonScope.findings.some(function (finding) { return finding.unitName === 'Later' || finding.unitName === 'Far'; }), 'event horizon limits future events only');
+  const defaultScope = runAssetManagementReview({
+    properties: [amProperty('P4', 'Delta House', [
+      amUnit('Old', 'Tenant Old', { break_date: new Date(2019, 0, 1) }),
+      amUnit('Mid', 'Tenant Mid', { expiry_date: addCalendarMonths(amValuation, 30) }),
+      amUnit('Far', 'Tenant Far', { expiry_date: addCalendarMonths(amValuation, 40) }),
+    ])],
+  });
+  assert(defaultScope.horizonMonths === 36 && defaultScope.findings.some(function (finding) { return finding.unitName === 'Old' && finding.status === 'historic'; }) && defaultScope.findings.some(function (finding) { return finding.unitName === 'Mid'; }) && !defaultScope.findings.some(function (finding) { return finding.unitName === 'Far'; }), 'the default horizon is 36 months and still keeps historic events');
+  const statusIgnored = deriveAssetManagementView(amReview, { status: 'historic' });
+  assert(statusIgnored.summary.historic > 0 && statusIgnored.summary.upcoming > 0, 'historic and upcoming events stay together without a status filter');
   const healthcareQueries = deriveAssetManagementView(amReview, { groupId: 'healthcare' });
   assert(healthcareQueries.findings.every(function (finding) { return finding.groupLabel === 'Healthcare'; }) && healthcareQueries.summary.propertiesReviewed === 1, 'group filter limits the dashboard');
   const marchBreaks = findingsForRegister(deriveAssetManagementView(amReview, {}).findings, { eventType: 'break', monthKey: '2026-10' });
@@ -1228,14 +1253,15 @@ try {
 
   const amPropertyBytes = makeWorkbook(propertyRefs, [propertyMap('Alpha', 'Healthcare', { 'General|External ID': 'P1' })]);
   const amUnitBytes = makeWorkbook(unitRefs, [
-    valuesRow(unitRefs, { 'General|Property Name': 'Alpha', 'General|Suite': 'A', 'General|Tenant Name': 'Tenant A', 'General|Lease Expiry': new Date(2040, 0, 1), 'Variable|Next Review': new Date(2026, 11, 31), 'General|Contracted Rent': 2500 }),
+    valuesRow(unitRefs, { 'General|Property Name': 'Alpha', 'General|Suite': 'A', 'General|Tenant Name': 'Tenant A', 'General|Lease Expiry': new Date(2040, 0, 1), 'Variable|Next Review': new Date(2026, 11, 31), 'General|Contracted Rent': 2500, 'Variable|Current Rent': 1800, 'Variable|Rental Value (ERV)': 2100, 'Variable|Free Rent (Months)': 3 }),
   ]);
   const amPortfolio = buildPortfolio(
     await parseBuffer(amPropertyBytes, 'am-property.xlsx', 'property'),
     await parseBuffer(amUnitBytes, 'am-units.xlsx', 'unit')
   );
   const amParsed = runAssetManagementReview({ properties: amPortfolio.properties, horizonMonths: 12 });
-  assert(amParsed.findings.some(function (finding) { return finding.title === 'Upcoming Rent Review' && finding.contractedRent === 2500 && finding.valuationLabel === '30/09/2026'; }), 'parsed current files use the property valuation date ' + amParsed.findings.map(function (finding) { return finding.title; }).join(','));
+  const parsedReview = amParsed.findings.filter(function (finding) { return finding.title === 'Upcoming Rent Review'; })[0];
+  assert(parsedReview && parsedReview.contractedRent === 2500 && parsedReview.currentRent === 1800 && parsedReview.marketRent === 2100 && parsedReview.rentFreeMonths === 3 && parsedReview.reviewedRent === null && parsedReview.valuationLabel === '30/09/2026', 'parsed current files use the property valuation date and canonical rent fields ' + amParsed.findings.map(function (finding) { return finding.title; }).join(','));
 
   resetPortfolioBreakdown();
 

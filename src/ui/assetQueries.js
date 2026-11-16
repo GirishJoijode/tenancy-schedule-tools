@@ -21,7 +21,6 @@ function emptyState() {
   return {
     horizon: AM_DEFAULT_HORIZON,
     eventType: 'all',
-    status: 'all',
     propertyId: '',
     groupId: '',
     measure: 'count',
@@ -86,7 +85,6 @@ function view() {
     propertyId: state.propertyId,
     groupId: state.groupId,
     eventType: state.eventType,
-    status: state.status,
   });
 }
 
@@ -135,30 +133,23 @@ function renderChrome() {
     return { id: property.propertyId, label: label };
   }));
   var groupField = state.groupOptions.length
-    ? '<label class="am-filter">Breakdown<select id="am-group" data-am-filter="group">' +
+    ? '<label class="am-filter am-filter-breakdown">Breakdown<select id="am-group" data-am-filter="group">' +
       selectOptions([{ id: '', label: 'All Portfolio' }].concat(state.groupOptions), state.groupId) +
       '</select></label>'
     : '';
   filters.innerHTML =
-    '<label class="am-filter">Portfolio<select id="am-property" data-am-filter="property">' + selectOptions(propertyOptions, state.propertyId) + '</select></label>' +
+    '<label class="am-filter am-filter-portfolio">Portfolio<select id="am-property" data-am-filter="property">' + selectOptions(propertyOptions, state.propertyId) + '</select></label>' +
     groupField +
-    '<label class="am-filter">Event Horizon<select id="am-horizon" data-am-filter="horizon">' +
+    '<label class="am-filter am-filter-horizon">Event Horizon<select id="am-horizon" data-am-filter="horizon">' +
     selectOptions(AM_HORIZONS.map(function (months) { return { id: String(months), label: months + ' Months' }; }), String(state.horizon)) +
     '</select></label>' +
-    '<label class="am-filter">Event Type<select id="am-event" data-am-filter="event">' +
+    '<label class="am-filter am-filter-event">Event Type<select id="am-event" data-am-filter="event">' +
     selectOptions([
       { id: 'all', label: 'All Events' },
       { id: 'rent_review', label: 'Rent Reviews' },
       { id: 'break', label: 'Breaks' },
       { id: 'expiry', label: 'Expiries' },
     ], state.eventType) +
-    '</select></label>' +
-    '<label class="am-filter">Status<select id="am-status" data-am-filter="status">' +
-    selectOptions([
-      { id: 'all', label: 'All' },
-      { id: 'historic', label: 'Historic' },
-      { id: 'upcoming', label: 'Upcoming' },
-    ], state.status) +
     '</select></label>';
 }
 
@@ -689,7 +680,7 @@ function renderBody() {
     state.selection = null;
     state.expandedPropertyId = '';
     state.drawerId = '';
-    body.innerHTML = kpis + '<section class="am-panel am-empty"><h3>No lease events requiring review were identified within the selected period.</h3><p>Increase the event horizon to 24 or 36 months, or clear a filter.</p></section>';
+    body.innerHTML = kpis + '<section class="am-panel am-empty"><h3>No lease events were identified for this selection.</h3><p>Historic events stay included. Adjust the portfolio, event type, or event horizon.</p></section>';
     body.scrollTop = heldScroll;
     renderDrawer(null);
     return;
@@ -707,6 +698,60 @@ function renderBody() {
   renderDrawer(drawerFinding);
 }
 
+function moneyText(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '\u2014';
+  return formatRent(value);
+}
+
+function monthsText(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '\u2014';
+  var months = Math.round(value);
+  return months + (Math.abs(months) === 1 ? ' month' : ' months');
+}
+
+function eventTypeName(eventType) {
+  if (eventType === 'rent_review') return 'Rent Review';
+  if (eventType === 'break') return 'Break Option';
+  if (eventType === 'expiry') return 'Lease Expiry';
+  return 'Lease event';
+}
+
+function drawerSection(title, rows) {
+  return '<section class="am-drawer-section"><h4>' + escapeHtml(title) + '</h4>' + rows.map(function (row) {
+    return detailRow(row[0], row[1]);
+  }).join('') + '</section>';
+}
+
+function eventDetails(finding) {
+  if (finding.eventType === 'rent_review') {
+    return drawerSection('Rent Review Details', [
+      ['Review date', finding.eventLabel],
+      ['Contracted rent', moneyText(finding.contractedRent)],
+      ['Current rent', moneyText(finding.currentRent)],
+      ['Updated / reviewed rent', moneyText(finding.reviewedRent)],
+      ['Market rent', moneyText(finding.marketRent)],
+    ]);
+  }
+  if (finding.eventType === 'break') {
+    return drawerSection('Break Details', [
+      ['Break date', finding.eventLabel],
+      ['Contracted rent', moneyText(finding.contractedRent)],
+      ['Current rent', moneyText(finding.currentRent)],
+      ['Market rent', moneyText(finding.marketRent)],
+      ['Rent free', monthsText(finding.rentFreeMonths)],
+      ['Void period', monthsText(finding.breakVoidMonths)],
+    ]);
+  }
+  return drawerSection('Lease Expiry Details', [
+    ['Expiry date', finding.eventLabel],
+    ['Contracted rent', moneyText(finding.contractedRent)],
+    ['Current rent', moneyText(finding.currentRent)],
+    ['Market rent', moneyText(finding.marketRent)],
+    ['Rent free', monthsText(finding.rentFreeMonths)],
+    ['Expiry void', monthsText(finding.expiryVoidMonths)],
+  ]);
+}
+
 function renderDrawer(finding) {
   var drawer = document.getElementById('am-drawer');
   if (!drawer) return;
@@ -717,19 +762,18 @@ function renderDrawer(finding) {
   }
   drawer.hidden = false;
   drawer.innerHTML =
-    '<div class="am-drawer-head"><h3>Query detail</h3><button type="button" class="am-drawer-close" data-am-close-drawer aria-label="Close query detail">\u00d7</button></div>' +
+    '<div class="am-drawer-head"><h3>Lease Event Detail</h3><button type="button" class="am-drawer-close" data-am-close-drawer aria-label="Close lease event detail">\u00d7</button></div>' +
     detailRow('Property', finding.propertyName) +
     detailRow('External ID', finding.externalId || '\u2014') +
     detailRow('Unit', finding.unitName) +
     detailRow('Tenant', finding.tenantName || '\u2014') +
-    detailRow('Event', finding.title) +
+    detailRow('Event', eventTypeName(finding.eventType)) +
     detailRow('Event date', finding.eventLabel) +
     detailRow('Valuation date', finding.valuationLabel) +
     detailRow('Timing', finding.timing) +
-    (finding.status === 'historic' ? detailRow('Attention', 'Event precedes valuation date') : '') +
-    '<h4>Observation</h4><p>' + escapeHtml(finding.observation) + '</p>' +
-    '<h4>Potential AM query</h4><p>' + escapeHtml(finding.suggestedQuery) + '</p>' +
-    '<h4>Source</h4><p class="am-source">' + escapeHtml(finding.source) + '</p>';
+    (finding.status === 'historic' ? detailRow('Status', 'Review') : '') +
+    eventDetails(finding) +
+    '<section class="am-drawer-section"><h4>Source</h4><p class="am-source">' + escapeHtml(finding.source) + '</p></section>';
 }
 
 function detailRow(label, value) {
@@ -790,7 +834,6 @@ function onFilterChange(event) {
     }
   }
   if (filter === 'event') state.eventType = event.target.value;
-  if (filter === 'status') state.status = event.target.value;
   if (filter === 'measure') state.measure = event.target.value;
   if (filter === 'group' || filter === 'property') renderChrome();
   renderBody();
