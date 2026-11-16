@@ -3,6 +3,7 @@ import { resolvePortfolioValuation } from '../logic/fairValue.js';
 import { readSourceValue } from '../schema/sourceLookup.js';
 import { PROPERTY_SOURCE_FIELDS } from '../schema/sourceFields.js';
 import { APP_STATE } from '../state.js';
+import { refreshAssetQueriesButton } from '../ui/assetQueries.js';
 import { escapeHtml, formatCount, qs, setStatusLines } from '../ui/common.js';
 import { syncPortfolioBreakdownToProperty } from '../ui/portfolioBreakdown.js';
 import { generateStandardisedSchedule } from './generator.js';
@@ -412,6 +413,7 @@ export function refreshStatus() {
   // Incomplete matching must NOT disable Generate - only require both files parsed.
   var canGenerate = Boolean(APP_STATE.property && APP_STATE.unit);
   generateBtn.disabled = !canGenerate;
+  refreshAssetQueriesButton();
 
   if (canGenerate) {
     var analysis = analyseMatching(APP_STATE.property, APP_STATE.unit);

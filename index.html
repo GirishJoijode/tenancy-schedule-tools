@@ -297,9 +297,15 @@
 
       <div class="generate-area">
         <div id="matching-summary" class="matching-summary hidden" aria-live="polite"></div>
-        <button type="button" id="generate-btn" class="generate-btn" disabled>
-          Generate Standardised Schedule
-        </button>
+        <div class="generate-actions">
+          <button type="button" id="am-queries-btn" class="am-queries-btn" disabled title="Upload both current Property and Unit files to enable Valuation Review.">
+            <svg class="am-queries-icon" viewBox="0 0 16 16" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5 6h6M5 8.5h6M5 11h3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            Valuation Review
+          </button>
+          <button type="button" id="generate-btn" class="generate-btn" disabled>
+            Generate Standardised Schedule
+          </button>
+        </div>
         <p class="generate-hint" id="generate-hint">
           Upload Property Level and Unit / TS Level .xlsx files to enable generation.
         </p>
@@ -518,6 +524,27 @@
     </header>
     <div id="portfolio-breakdown-root" class="report-body"></div>
     <footer id="portfolio-breakdown-footer" class="report-footer"></footer>
+  </div>
+</div>
+
+<div id="am-workspace" class="am-workspace" role="dialog" aria-modal="true" aria-labelledby="am-title" aria-describedby="am-subtitle" hidden>
+  <div class="am-backdrop"></div>
+  <div class="am-dialog">
+    <header class="am-header">
+      <div class="am-header-copy">
+        <h2 id="am-title">Valuation Review</h2>
+        <p id="am-subtitle">Lease events and potential discussion points identified from the current valuation data.</p>
+      </div>
+      <div class="am-header-side">
+        <p id="am-portfolio-count" class="am-portfolio-count">Current portfolio</p>
+        <button type="button" class="am-close" id="am-close" aria-label="Close valuation review">×</button>
+      </div>
+    </header>
+    <div class="am-stage">
+      <div id="am-filters" class="am-filters"></div>
+      <div id="am-body" class="am-body"></div>
+      <aside id="am-drawer" class="am-drawer" aria-label="Query detail" hidden></aside>
+    </div>
   </div>
 </div>
 

@@ -11,11 +11,13 @@ import { setupConfigurationTool } from './configTool/ui.js';
 import { setupReportFields } from './standardiser/reportFields.js';
 import { setupUploadGuides } from './standardiser/uploadGuide.js';
 import { setupPortfolioBreakdown } from './ui/portfolioBreakdown.js';
+import { setupAssetQueries } from './ui/assetQueries.js';
 
 function init() {
   document.querySelectorAll('#schedule-tenancy .dropzone').forEach(setupDropzone);
   setupScheduleTypeSwitcher();
   setupPortfolioBreakdown();
+  setupAssetQueries();
   setupReportFields();
   setupUploadGuides();
   setupPropertySummaryTool();
